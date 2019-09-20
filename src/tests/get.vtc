@@ -4,7 +4,7 @@ varnishtest "reader constructor and .get()"
 
 shell {echo -n "foo bar baz quux" > ${tmpdir}/file}
 
-varnish v1 -vcl+backend {
+varnish v1 -vcl {
 	import ${vmod_file};
 	backend b { .host = "${bad_ip}"; }
 
@@ -29,7 +29,7 @@ client c1 {
 	expect resp.http.Get == "foo bar baz quux"
 } -run
 
-varnish v1 -vcl+backend {
+varnish v1 -vcl {
 	import ${vmod_file};
 	backend b { .host = "${bad_ip}"; }
 
