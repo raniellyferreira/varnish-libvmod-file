@@ -1,0 +1,45 @@
+# looks like -*- vcl -*-
+
+varnishtest "vcl.use and .discard, and version strings"
+
+varnish v1 -vcl {
+	import ${vmod_file};
+	backend b { .host = "${bad_ip}"; }
+} -start
+
+varnish v1 -vcl {backend b { .host = "${bad_ip}"; }}
+
+varnish v1 -cli "vcl.list"
+varnish v1 -cli "vcl.use vcl1"
+
+varnish v1 -cli "vcl.use vcl2"
+varnish v1 -cli "vcl.use vcl1"
+
+varnish v1 -cli "vcl.show vcl1"
+varnish v1 -cli "vcl.use vcl2"
+varnish v1 -cli "vcl.discard vcl1"
+varnish v1 -cli "vcl.list"
+
+varnish v1 -vcl {
+	import ${vmod_file};
+	backend b { .host = "${bad_ip}"; }
+
+	sub vcl_recv {
+		return(synth(200));
+	}
+
+	sub vcl_synth {
+		set resp.http.x-version = file.version();
+		if (!resp.http.x-version) {
+			set resp.status = 500;
+		}
+		return(deliver);
+	}
+}
+
+client c1 {
+	txreq -url "/"
+	rxresp
+	expect resp.status == 200
+	expect resp.http.x-version ~ "^.+$"
+} -run

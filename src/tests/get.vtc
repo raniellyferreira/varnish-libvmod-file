@@ -1,0 +1,30 @@
+# looks like -*- vcl -*-
+
+varnishtest "reader constructor and .get()"
+
+shell {echo "foo bar baz quux" > ${tmpdir}/file}
+
+varnish v1 -vcl+backend {
+	import ${vmod_file};
+	backend b { .host = "${bad_ip}"; }
+
+	sub vcl_init {
+		new rdr = file.reader("${tmpdir}/file");
+	}
+
+	sub vcl_recv {
+		return (synth(200));
+	}
+
+	sub vcl_synth {
+		set resp.http.Get = rdr.get();
+		return (deliver);
+	}
+} -start
+
+client c1 {
+	txreq
+	rxresp
+	expect resp.status == 200
+	expect resp.http.Get == "foo bar baz quux"
+} -run
