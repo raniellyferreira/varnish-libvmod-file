@@ -142,7 +142,7 @@ check(union sigval val)
 	rdr->flags &= ~RDR_MAPPED;
 
 	errno = 0;
-	if ((fd = open(info->path, O_RDWR)) < 0) {
+	if ((fd = open(info->path, O_RDONLY)) < 0) {
 		VERRMSG(rdr, "%s: cannot open %s: %s", rdr->vcl_name,
 			info->path, vstrerror(errno));
 		VSL(SLT_Error, 0, rdr->errbuf);
@@ -150,9 +150,17 @@ check(union sigval val)
 		return;
 	}
 
+	/*
+	 * By mapping the length st_size + 1, and due to the fact that
+	 * mmap(2) fills the region of the mapped page past the length of
+	 * the file with 0's, we ensure that there is a terminating null
+	 * byte in the mapping after the file contents. So that the mapped
+	 * address can be used as a VCL_STRING or a C string, without
+	 * having to make copies.
+	 */
 	errno = 0;
-	if ((addr = mmap(NULL, st.st_size + 1, PROT_READ|PROT_WRITE,
-			 MAP_PRIVATE, fd, 0)) == MAP_FAILED) {
+	if ((addr = mmap(NULL, st.st_size + 1, PROT_READ, MAP_PRIVATE, fd, 0))
+	    == MAP_FAILED) {
 		VERRMSG(rdr, "%s: could not map %s: %s", rdr->vcl_name,
 			info->path, vstrerror(errno));
 		VSL(SLT_Error, 0, rdr->errbuf);
@@ -163,12 +171,6 @@ check(union sigval val)
 	closefd(&fd);
 	AN(addr);
 	rdr->flags |= RDR_MAPPED;
-
-	/*
-	 * Add a terminating null byte, so that the mapped file can be
-	 * used as a VCL_STRING or a C string.
-	 */
-	*((char *)(addr + st.st_size)) = '\0';
 
 	info->mtime.tv_sec = st.st_mtim.tv_sec;
 	info->mtime.tv_nsec = st.st_mtim.tv_nsec;
