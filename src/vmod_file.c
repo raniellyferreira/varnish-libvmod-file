@@ -208,7 +208,7 @@ vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 		return;
 	}
 	if (ttl <= 0) {
-		VFAIL(ctx, "new %s: ttl %.03f must be > 0", vcl_name, ttl);
+		VFAIL(ctx, "new %s: ttl %.03f must be > 0s", vcl_name, ttl);
 		return;
 	}
 
