@@ -38,11 +38,12 @@ varnish v1 -vcl+backend {
 	}
 
 	sub vcl_recv {
+		set req.http.Get = rdr.get();
 		return (synth(200));
 	}
 
 	sub vcl_synth {
-		set resp.http.Get = rdr.get();
+		set resp.http.Get = req.http.Get;
 		return (deliver);
 	}
 }
@@ -57,4 +58,24 @@ client c1 {
 	rxresp
 	expect resp.status == 200
 	expect resp.http.Get == "quux baz bar foo"
+} -run
+
+shell {rm -f ${tmpdir}/file}
+delay .1
+
+client c1 {
+	txreq
+	rxresp
+	expect resp.status == 503
+	expect resp.reason == "VCL failed"
+} -run
+
+logexpect l1 -v v1 -d 1 -g vxid -q "VCL_Error" {
+	expect 0 * Begin	req
+	expect * = VCL_Error	{^rdr\.get\(\): vmod file failure: rdr: cannot read info about}
+	expect * = End
+} -run
+
+logexpect l1 -v v1 -d 1 -g raw -q "Error" {
+	expect * 0 Error	{^vmod file failure: rdr: cannot read info about}
 } -run

@@ -47,9 +47,6 @@
 
 #include "vcc_if.h"
 
-#define FAIL(ctx, msg)					\
-        VRT_fail((ctx), "vmod file failure: " msg)
-
 #define VFAIL(ctx, fmt, ...)					\
         VRT_fail((ctx), "vmod file failure: " fmt, __VA_ARGS__)
 
@@ -352,7 +349,7 @@ vmod_reader_get(VRT_CTX, struct VPFX(file_reader) *rdr)
 	}
 
 	AN(strcmp(rdr->errbuf, NO_ERR));
-	VFAIL(ctx, "%s.get(): %s", rdr->vcl_name, rdr->errbuf);
+	VRT_fail(ctx, "%s.get(): %s", rdr->vcl_name, rdr->errbuf);
 	return (NULL);
 }
 
