@@ -82,3 +82,12 @@ logexpect l1 -v v1 -d 1 -g vxid -q "VCL_Error" {
 logexpect l1 -v v1 -d 1 -g raw -q "Error" {
 	expect * 0 Error	{^vmod file failure: rdr: cannot read info about}
 } -run
+
+varnish v1 -errvcl {not a regular file} {
+	import ${vmod_file};
+	backend b { .host = "${bad_ip}"; }
+
+	sub vcl_init {
+		new rdr = file.reader("${tmpdir}");
+	}
+}
