@@ -258,9 +258,9 @@ vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 	timerspec.it_value.tv_sec = 0;
 	timerspec.it_value.tv_nsec = 1;
 	timerspec.it_interval.tv_sec = (time_t)ttl;
-	assert(timerspec.it_interval.tv_sec - ttl < 1.);
+	assert(ttl - timerspec.it_interval.tv_sec < 1.);
 	timerspec.it_interval.tv_nsec
-		= (long)(1e9 * (timerspec.it_interval.tv_sec - ttl));
+		= (long)(1e9 * (ttl - timerspec.it_interval.tv_sec));
 
 	errno = 0;
 	if (timer_settime(timerid, 0, &timerspec, NULL) != 0) {
