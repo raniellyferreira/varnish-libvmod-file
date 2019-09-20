@@ -1,7 +1,7 @@
 AUTOMAKE_OPTIONS = subdir-objects
 
 AM_CFLAGS = $(VARNISHAPI_CFLAGS) -Wall -Werror -Wextra -std=c99
-AM_LDFLAGS = $(VARNISHAPI_LIBS) -ldl
+AM_LDFLAGS = $(VARNISHAPI_LIBS) -ldl -lrt
 
 vmod_LTLIBRARIES = libvmod_file.la
 

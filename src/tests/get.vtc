@@ -2,7 +2,7 @@
 
 varnishtest "reader constructor and .get()"
 
-shell {echo "foo bar baz quux" > ${tmpdir}/file}
+shell {echo -n "foo bar baz quux" > ${tmpdir}/file}
 
 varnish v1 -vcl+backend {
 	import ${vmod_file};
