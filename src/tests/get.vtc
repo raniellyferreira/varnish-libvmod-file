@@ -109,3 +109,6 @@ varnish v1 -errvcl {vmod file failure: new rdr: ttl -1.000 must be > 0s} {
 		new rdr = file.reader("foo", ttl=-1s);
 	}
 }
+
+varnish v1 -cliok "vcl.discard vcl1"
+varnish v1 -cli "vcl.list"
