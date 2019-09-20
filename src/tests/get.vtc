@@ -48,6 +48,9 @@ varnish v1 -vcl+backend {
 	}
 }
 
+# Rnu twice with a delay between, to test the "no change" case.
+client c1 -run
+delay .1
 client c1 -run
 
 shell {echo -n "quux baz bar foo" > ${tmpdir}/file}
