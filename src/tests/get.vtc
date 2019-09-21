@@ -29,6 +29,28 @@ client c1 {
 	expect resp.http.Get == "foo bar baz quux"
 } -run
 
+shell {ln -s ${tmpdir}/file ${tmpdir}/link}
+
+varnish v1 -vcl {
+	import ${vmod_file};
+	backend b { .host = "${bad_ip}"; }
+
+	sub vcl_init {
+		new rdr = file.reader("${tmpdir}/link");
+	}
+
+	sub vcl_recv {
+		return (synth(200));
+	}
+
+	sub vcl_synth {
+		set resp.http.Get = rdr.get();
+		return (deliver);
+	}
+}
+
+client c1 -run
+
 varnish v1 -vcl {
 	import ${vmod_file};
 	backend b { .host = "${bad_ip}"; }
@@ -134,6 +156,17 @@ varnish v1 -errvcl {not a regular file} {
 
 	sub vcl_init {
 		new rdr = file.reader("${tmpdir}");
+	}
+}
+
+shell {ln -s ${tmpdir} ${tmpdir}/dirlink}
+
+varnish v1 -errvcl {not a regular file} {
+	import ${vmod_file};
+	backend b { .host = "${bad_ip}"; }
+
+	sub vcl_init {
+		new rdr = file.reader("${tmpdir}/dirlink");
 	}
 }
 
