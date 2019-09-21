@@ -43,7 +43,6 @@
 
 #include "cache/cache.h"
 #include "vcl.h"
-#include "vtim.h"
 
 #include "vcc_if.h"
 
@@ -54,7 +53,6 @@
 	snprintf((rdr)->errbuf, (rdr)->errlen, "vmod file failure: " fmt, \
 		 __VA_ARGS__)
 
-#define INIT_SLEEP_INTERVAL 0.001
 #define ERRMSG_LEN 128
 #define NO_ERR ("No error")
 
@@ -76,12 +74,13 @@ struct file_info {
 struct VPFX(file_reader) {
 	unsigned		magic;
 #define FILE_READER_MAGIC 0x08d18e5b
-	timer_t			timerid;
+	pthread_rwlock_t	lock;
 	struct file_info	*info;
-	char			*vcl_name;
 	char			*addr;
+	char			*vcl_name;
 	char			*errbuf;
 	size_t			errlen;
+	timer_t			timerid;
 	int			flags;
 };
 
@@ -101,13 +100,15 @@ check(union sigval val)
 	AN(rdr->errbuf);
 	AN(info->path);
 
+	AZ(pthread_rwlock_wrlock(&rdr->lock));
+
 	errno = 0;
 	if (stat(info->path, &st) != 0) {
 		VERRMSG(rdr, "%s: cannot read info about %s: %s", rdr->vcl_name,
 			info->path, vstrerror(errno));
 		VSL(SLT_Error, 0, rdr->errbuf);
 		rdr->flags |= RDR_ERROR;
-		return;
+		goto out;
 	}
 
 	if (!S_ISREG(st.st_mode)) {
@@ -115,7 +116,7 @@ check(union sigval val)
 			info->path);
 		VSL(SLT_Error, 0, rdr->errbuf);
 		rdr->flags |= RDR_ERROR;
-		return;
+		goto out;
 	}
 
 	if ((rdr->flags & (RDR_INITIALIZED | RDR_MAPPED))
@@ -123,7 +124,7 @@ check(union sigval val)
 	    && info->mtime.tv_nsec == st.st_mtim.tv_nsec
 	    && info->dev == st.st_dev && info->ino == st.st_ino) {
 		AN(rdr->addr);
-		return;
+		goto out;
 	}
 
 	if (rdr->flags & RDR_MAPPED) {
@@ -133,7 +134,7 @@ check(union sigval val)
 				vstrerror(errno));
 			VSL(SLT_Error, 0, rdr->errbuf);
 			rdr->flags |= RDR_ERROR;
-			return;
+			goto out;
 		}
 	}
 	rdr->flags &= ~RDR_MAPPED;
@@ -144,7 +145,7 @@ check(union sigval val)
 			info->path, vstrerror(errno));
 		VSL(SLT_Error, 0, rdr->errbuf);
 		rdr->flags |= RDR_ERROR;
-		return;
+		goto out;
 	}
 
 	/*
@@ -163,7 +164,7 @@ check(union sigval val)
 		VSL(SLT_Error, 0, rdr->errbuf);
 		rdr->flags |= RDR_ERROR;
 		closefd(&fd);
-		return;
+		goto out;
 	}
 	closefd(&fd);
 	AN(addr);
@@ -179,6 +180,9 @@ check(union sigval val)
 	rdr->flags &= ~RDR_ERROR;
 	strcpy(rdr->errbuf, NO_ERR);
 	rdr->flags |= RDR_INITIALIZED;
+
+ out:
+	AZ(pthread_rwlock_unlock(&rdr->lock));
 	return;
 }
 
@@ -192,6 +196,7 @@ vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 	struct sigevent sigev;
 	timer_t timerid;
 	struct itimerspec timerspec;
+	int flags;
 
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	AN(rdrp);
@@ -225,6 +230,13 @@ vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 	if (rdr == NULL) {
 		VFAIL(ctx, "new %s: allocating space for object: %s",
 		      vcl_name, vstrerror(errno));
+		return;
+	}
+
+	errno = 0;
+	if (pthread_rwlock_init(&rdr->lock, NULL) != 0) {
+		VFAIL(ctx, "new %s: initializing lock: %s", vcl_name,
+		      vstrerror(errno));
 		return;
 	}
 
@@ -275,8 +287,10 @@ vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 	AZ(rdr->info->mtime.tv_nsec);
 	AZ(rdr->flags & (RDR_INITIALIZED | RDR_ERROR));
 	do {
-		VTIM_sleep(INIT_SLEEP_INTERVAL);
-	} while ((rdr->flags & (RDR_INITIALIZED | RDR_ERROR)) == 0);
+		AZ(pthread_rwlock_wrlock(&rdr->lock));
+		flags = rdr->flags;
+		AZ(pthread_rwlock_unlock(&rdr->lock));
+	} while ((flags & (RDR_INITIALIZED | RDR_ERROR)) == 0);
 
 	if (rdr->flags & RDR_ERROR) {
 		AN(strcmp(rdr->errbuf, NO_ERR));
@@ -339,18 +353,26 @@ vmod_reader__fini(struct VPFX(file_reader) **rdrp)
 VCL_STRING
 vmod_reader_get(VRT_CTX, struct VPFX(file_reader) *rdr)
 {
+	int flags;
+	VCL_STRING addr;
+
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	CHECK_OBJ_NOTNULL(rdr, FILE_READER_MAGIC);
 
-	if ((rdr->flags & RDR_ERROR) == 0) {
-		AN(rdr->addr);
-		AN(rdr->flags & RDR_MAPPED);
-		return (rdr->addr);
+	AZ(pthread_rwlock_rdlock(&rdr->lock));
+	flags = rdr->flags;
+	addr = rdr->addr;
+	AZ(pthread_rwlock_unlock(&rdr->lock));
+
+	if (flags & RDR_ERROR) {
+		AN(strcmp(rdr->errbuf, NO_ERR));
+		VRT_fail(ctx, "%s.get(): %s", rdr->vcl_name, rdr->errbuf);
+		return (NULL);
 	}
 
-	AN(strcmp(rdr->errbuf, NO_ERR));
-	VRT_fail(ctx, "%s.get(): %s", rdr->vcl_name, rdr->errbuf);
-	return (NULL);
+	AN(flags & RDR_MAPPED);
+	AN(addr);
+	return (addr);
 }
 
 VCL_STRING
