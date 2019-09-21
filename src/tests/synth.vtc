@@ -1,0 +1,84 @@
+# looks like -*- vcl -*-
+
+varnishtest "reader.synth()"
+
+shell {echo -n "foo bar baz quux" > ${tmpdir}/synth}
+
+varnish v1 -vcl {
+	import ${vmod_file};
+	backend b { .host = "${bad_ip}"; }
+
+	sub vcl_init {
+		new rdr = file.reader("${tmpdir}/synth", ttl=0.1s);
+	}
+
+	sub vcl_recv {
+		return (synth(200));
+	}
+
+	sub vcl_synth {
+		rdr.synth();
+		return (deliver);
+	}
+} -start
+
+client c1 {
+	txreq
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "foo bar baz quux"
+} -run
+
+shell {echo -n "quux baz bar foo" > ${tmpdir}/synth}
+delay .1
+
+client c1 {
+	txreq
+	rxresp
+	expect resp.status == 200
+	expect resp.body == "quux baz bar foo"
+} -run
+
+shell {rm -f ${tmpdir}/synth}
+delay .1
+
+client c1 {
+	txreq
+	expect_close
+} -run
+
+logexpect l1 -v v1 -d 1 -g vxid -q "VCL_Error" {
+	expect 0 * Begin	req
+	expect * = VCL_Error	{^rdr\.synth\(\): vmod file failure: rdr: cannot read info about}
+	expect * = End
+} -run
+
+shell {touch ${tmpdir}/synth}
+
+varnish v1 -vcl {
+	import ${vmod_file};
+	backend b { .host = "${bad_ip}"; }
+
+	sub vcl_init {
+		new rdr = file.reader("${tmpdir}/synth");
+	}
+
+	sub vcl_recv {
+		rdr.synth();
+	}
+}
+
+logexpect l1 -v v1 -d 0 -g vxid -q "VCL_Error" {
+	expect 0 * Begin	req
+	expect * = VCL_Error	{^rdr\.synth\(\) may only be called in vcl_synth$}
+	expect * = End
+} -start
+
+client c1 {
+	txreq
+	rxresp
+	expect resp.status == 503
+	expect resp.reason == "VCL failed"
+} -run
+
+logexpect l1 -wait

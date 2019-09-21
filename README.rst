@@ -67,6 +67,16 @@ cached contents are returned.
 
 XXX ...
 
+.. _xreader.synth():
+
+VOID xreader.synth()
+--------------------
+
+Generate a synthetic client response body from the file contents. This
+method may only be called in ``vcl_synth``.
+
+XXX ...
+
 .. _file.version():
 
 STRING version()

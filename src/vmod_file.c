@@ -473,6 +473,38 @@ vmod_reader_get(VRT_CTX, struct VPFX(file_reader) *rdr)
 	return (rdr->addr);
 }
 
+VCL_VOID
+vmod_reader_synth(VRT_CTX, struct VPFX(file_reader) *rdr)
+{
+	const char *p[0];
+	struct strands strands = { 1, p };
+
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(rdr, FILE_READER_MAGIC);
+
+	if ((ctx->method & VCL_MET_SYNTH) == 0) {
+		VRT_fail(ctx, "%s.synth() may only be called in vcl_synth",
+			 rdr->vcl_name);
+		return;
+	}
+
+	AZ(pthread_rwlock_rdlock(&rdr->lock));
+	if (rdr->flags & RDR_ERROR) {
+		AN(strcmp(rdr->errbuf, NO_ERR));
+		VRT_fail(ctx, "%s.synth(): %s", rdr->vcl_name, rdr->errbuf);
+		AZ(pthread_rwlock_unlock(&rdr->lock));
+		return;
+	}
+
+	AN(rdr->flags & RDR_MAPPED);
+	AN(rdr->addr);
+	strands.p[0] = rdr->addr;
+	VRT_synth_page(ctx, &strands);
+
+	AZ(pthread_rwlock_unlock(&rdr->lock));
+	return;
+}
+
 VCL_STRING
 vmod_version(VRT_CTX)
 {

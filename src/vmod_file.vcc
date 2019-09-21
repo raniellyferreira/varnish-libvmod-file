@@ -50,6 +50,13 @@ cached contents are returned.
 
 XXX ...
 
+$Method VOID .synth()
+
+Generate a synthetic client response body from the file contents. This
+method may only be called in ``vcl_synth``.
+
+XXX ...
+
 $Function STRING version()
 
 Return the version string for this VMOD.
