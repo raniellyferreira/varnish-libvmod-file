@@ -40,15 +40,16 @@ XXX ...
 
 .. _file.reader():
 
-new xreader = file.reader(STRING name, STRING path, DURATION ttl)
------------------------------------------------------------------
+new xreader = file.reader(STRING name, STRING path, DURATION ttl, BOOL log_checks)
+----------------------------------------------------------------------------------
 
 ::
 
    new xreader = file.reader(
       STRING name,
       STRING path="/usr/local/etc/varnish:/usr/local/share/varnish/vcl:/usr/etc/varnish:/usr/share/varnish/vcl",
-      DURATION ttl=120
+      DURATION ttl=120,
+      BOOL log_checks=0
    )
 
 XXX ...
