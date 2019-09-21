@@ -67,6 +67,7 @@ struct file_info {
 	size_t		len;
 	dev_t		dev;
 	ino_t		ino;
+	VCL_BOOL	log_checks;
 };
 
 #define RDR_INITIALIZED	(1 << 0)
@@ -95,6 +96,7 @@ check(union sigval val)
 	struct stat st;
 	int fd;
 	void *addr;
+	char timbuf[VTIM_FORMAT_SIZE];
 
 	CAST_OBJ_NOTNULL(rdr, val.sival_ptr, FILE_READER_MAGIC);
 	CHECK_OBJ_NOTNULL(rdr->info, FILE_INFO_MAGIC);
@@ -102,6 +104,12 @@ check(union sigval val)
 	AN(rdr->vcl_name);
 	AN(rdr->errbuf);
 	AN(info->path);
+
+	if (info->log_checks) {
+		VTIM_format(VTIM_real(), timbuf);
+		VSL(SLT_Debug, 0, "vmod file: %s: check for %s running at %s",
+		    rdr->vcl_name, info->path, timbuf);
+	}
 
 	AZ(pthread_rwlock_wrlock(&rdr->lock));
 
@@ -128,6 +136,12 @@ check(union sigval val)
 	    && info->dev == st.st_dev && info->ino == st.st_ino) {
 		AN(rdr->addr);
 		goto out;
+	}
+
+	if (info->log_checks) {
+		VTIM_format(VTIM_real(), timbuf);
+		VSL(SLT_Debug, 0, "vmod file: %s: updating %s at %s",
+		    rdr->vcl_name, info->path, timbuf);
 	}
 
 	if (rdr->flags & RDR_MAPPED) {
@@ -186,13 +200,21 @@ check(union sigval val)
 
  out:
 	AZ(pthread_rwlock_unlock(&rdr->lock));
+
+	if (info->log_checks) {
+		VTIM_format(VTIM_real(), timbuf);
+		VSL(SLT_Debug, 0,
+		    "vmod file: %s: check for %s finished successfully at %s",
+		    rdr->vcl_name, info->path, timbuf);
+	}
 	return;
 }
 
 VCL_VOID
 vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 		  const char *vcl_name, struct vmod_priv *priv,
-		  VCL_STRING name, VCL_STRING path, VCL_DURATION ttl)
+		  VCL_STRING name, VCL_STRING path, VCL_DURATION ttl,
+		  VCL_BOOL log_checks)
 {
 	struct VPFX(file_reader) *rdr;
 	struct file_info *info;
@@ -233,6 +255,7 @@ vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 
 	rdr->info = info;
 	rdr->vcl_name = strdup(vcl_name);
+	info->log_checks = log_checks;
 
 	if (*name == '/')
 		info->path = strdup(name);

@@ -56,7 +56,8 @@ varnish v1 -vcl {
 	backend b { .host = "${bad_ip}"; }
 
 	sub vcl_init {
-		new rdr = file.reader("${tmpdir}/file", ttl=0.1s);
+		new rdr = file.reader("${tmpdir}/file", ttl=0.1s,
+		                      log_checks=true);
 	}
 
 	sub vcl_recv {
@@ -83,6 +84,12 @@ client c1 {
 	rxresp
 	expect resp.status == 200
 	expect resp.http.Get == "quux baz bar foo"
+} -run
+
+logexpect l1 -v v1 -d 1 -g raw -q "Debug" {
+	expect * * Debug	{^vmod file: rdr: check for \S+ running at}
+	expect * * Debug	{^vmod file: rdr: updating \S+ at}
+	expect * * Debug	{^vmod file: rdr: check for \S+ finished successfully at}
 } -run
 
 shell {rm -f ${tmpdir}/file}
