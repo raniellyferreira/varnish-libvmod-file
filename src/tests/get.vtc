@@ -83,6 +83,51 @@ logexpect l1 -v v1 -d 1 -g raw -q "Error" {
 	expect * 0 Error	{^vmod file failure: rdr: cannot read info about}
 } -run
 
+shell {echo -n "The quick brown fox jumps over the lazy dog." > ${tmpdir}/fox}
+
+varnish v1 -vcl {
+	import ${vmod_file};
+	backend b { .host = "${bad_ip}"; }
+
+	sub vcl_init {
+		new rdr = file.reader("${tmpdir}/fox", ttl=0s);
+	}
+
+	sub vcl_recv {
+		return (synth(200));
+	}
+
+	sub vcl_synth {
+		set resp.http.Get = rdr.get();
+		return (deliver);
+	}
+}
+
+client c1 {
+	txreq
+	rxresp
+	expect resp.status == 200
+	expect resp.http.Get ~ "fox"
+} -run
+
+shell {echo -n "twentieth century fox" > ${tmpdir}/fox}
+delay .1
+
+# Whether or not the client sees the change, although no update checks
+# are performed, depends on whether changes in MAP_PRIVATE mapped
+# files are reflected in the mapped page. According to mmap(2), this
+# is unspecified. The change is apparently seen on Linux. Check the
+# test log to see if it happened on the present platform.
+client c1 -run
+
+shell {rm -f ${tmpdir}/fox}
+delay .1
+
+# On Linux at least, the mapping is retained after file deletion
+# (until munmap), so the client will still see the mapped contents.
+# XXX test on other platforms
+client c1 -run
+
 varnish v1 -errvcl {not a regular file} {
 	import ${vmod_file};
 	backend b { .host = "${bad_ip}"; }
@@ -101,7 +146,7 @@ varnish v1 -errvcl {vmod file failure: new rdr: name is empty} {
 	}
 }
 
-varnish v1 -errvcl {vmod file failure: new rdr: ttl -1.000 must be > 0s} {
+varnish v1 -errvcl {vmod file failure: new rdr: ttl -1.000 must be >= 0s} {
 	import ${vmod_file};
 	backend b { .host = "${bad_ip}"; }
 
