@@ -88,6 +88,15 @@ struct VPFX(file_reader) {
 	int			flags;
 };
 
+struct timer_entry {
+	unsigned		magic;
+#define TIMER_ENTRY_MAGIC 0xa0059ebd
+	VSLIST_ENTRY(timer_entry) list;
+	timer_t			timerid;
+};
+
+VSLIST_HEAD(timer_head, timer_entry);
+
 static void
 check(union sigval val)
 {
@@ -210,6 +219,23 @@ check(union sigval val)
 	return;
 }
 
+static struct timer_head *
+init_priv_vcl(struct vmod_priv *priv)
+{
+	struct timer_head *th;
+
+	AN(priv);
+	if (priv->priv == NULL) {
+		th = malloc(sizeof(*th));
+		AN(th);
+		priv->priv = th;
+		VSLIST_INIT(th);
+	}
+	else
+		th = priv->priv;
+	return (th);
+}
+
 VCL_VOID
 vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 		  const char *vcl_name, struct vmod_priv *priv,
@@ -221,6 +247,8 @@ vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 	struct sigevent sigev;
 	timer_t timerid;
 	struct itimerspec timerspec;
+	struct timer_head *th;
+	struct timer_entry *tent;
 
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	AN(rdrp);
@@ -346,6 +374,17 @@ vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 	}
 	rdr->flags |= RDR_TIMER_INIT;
 
+	th = init_priv_vcl(priv);
+	AN(th);
+	errno = 0;
+	ALLOC_OBJ(tent, TIMER_ENTRY_MAGIC);
+	if (tent == NULL) {
+		VFAIL(ctx, "new %s: allocating timer list entry: %s", vcl_name,
+		      vstrerror(errno));
+		return;
+	}
+	tent->timerid = timerid;
+	VSLIST_INSERT_HEAD(th, tent, list);
 
 	AZ(rdr->addr);
 	AZ(rdr->info->mtime.tv_sec);
@@ -450,15 +489,68 @@ vmod_version(VRT_CTX)
 int
 VPFX(event)(VRT_CTX, struct vmod_priv *priv, enum vcl_event_e e)
 {
+	struct timer_head *th;
+	struct timer_entry *ent;
+	struct itimerspec timer;
+
 	ASSERT_CLI();
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	AN(priv);
 
+	th = init_priv_vcl(priv);
+	AN(th);
+
 	switch (e) {
-	case VCL_EVENT_LOAD:
 	case VCL_EVENT_DISCARD:
+		while (!VSLIST_EMPTY(th)) {
+			/* object .fini deletes the timers */
+			ent = VSLIST_FIRST(th);
+			CHECK_OBJ_NOTNULL(ent, TIMER_ENTRY_MAGIC);
+			VSLIST_REMOVE_HEAD(th, list);
+			FREE_OBJ(ent);
+		}
+		return (0);
 	case VCL_EVENT_WARM:
+		VSLIST_FOREACH(ent, th, list) {
+			CHECK_OBJ_NOTNULL(ent, TIMER_ENTRY_MAGIC);
+			errno = 0;
+			if (timer_gettime(ent->timerid, &timer) != 0) {
+				VSB_printf(ctx->msg,
+					   "vmod file: reading timer: %s",
+					   vstrerror(errno));
+				return (-1);
+			}
+			timer.it_value.tv_sec = 0;
+			timer.it_value.tv_nsec = 1;
+			if (timer_settime(ent->timerid, 0, &timer, NULL) != 0) {
+				VSB_printf(ctx->msg,
+					   "vmod file: restarting timer: %s",
+					   vstrerror(errno));
+				return (-1);
+			}
+		}
+		return (0);
 	case VCL_EVENT_COLD:
+		VSLIST_FOREACH(ent, th, list) {
+			CHECK_OBJ_NOTNULL(ent, TIMER_ENTRY_MAGIC);
+			errno = 0;
+			if (timer_gettime(ent->timerid, &timer) != 0) {
+				VSL(SLT_Error, 0,
+				    "vmod file: reading timer: %s",
+				    vstrerror(errno));
+				continue;
+			}
+			timer.it_value.tv_sec = 0;
+			timer.it_value.tv_nsec = 0;
+			if (timer_settime(ent->timerid, 0, &timer, NULL) != 0) {
+				VSL(SLT_Debug, 0,
+				    "vmod file: suspending timer: %s",
+				    vstrerror(errno));
+				continue;
+			}
+		}
+		return (0);
+	case VCL_EVENT_LOAD:
 		return (0);
 	default:
 		WRONG("illegal event enum");
