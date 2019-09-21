@@ -515,6 +515,16 @@ vmod_reader_error(VRT_CTX, struct VPFX(file_reader) *rdr)
 }
 
 VCL_STRING
+vmod_reader_errmsg(VRT_CTX, struct VPFX(file_reader) *rdr)
+{
+	CHECK_OBJ_NOTNULL(rdr, FILE_READER_MAGIC);
+	(void)ctx;
+
+	AN(rdr->errbuf);
+	return (rdr->errbuf);
+}
+
+VCL_STRING
 vmod_version(VRT_CTX)
 {
 	(void) ctx;

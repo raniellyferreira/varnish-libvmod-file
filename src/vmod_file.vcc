@@ -64,6 +64,14 @@ time the file was checked.
 
 XXX ...
 
+$Method STRING .errmsg()
+
+Returns the error message for any error condition determined the last
+time the file was checked, or a message indicating that there was no
+error.
+
+XXX ...
+
 $Function STRING version()
 
 Return the version string for this VMOD.

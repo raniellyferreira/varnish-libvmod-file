@@ -87,6 +87,17 @@ time the file was checked.
 
 XXX ...
 
+.. _xreader.errmsg():
+
+STRING xreader.errmsg()
+-----------------------
+
+Returns the error message for any error condition determined the last
+time the file was checked, or a message indicating that there was no
+error.
+
+XXX ...
+
 .. _file.version():
 
 STRING version()
