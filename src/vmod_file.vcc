@@ -57,6 +57,13 @@ method may only be called in ``vcl_synth``.
 
 XXX ...
 
+$Method BOOL .error()
+
+Returns true if and only if an error condition was determined the last
+time the file was checked.
+
+XXX ...
+
 $Function STRING version()
 
 Return the version string for this VMOD.

@@ -77,6 +77,16 @@ method may only be called in ``vcl_synth``.
 
 XXX ...
 
+.. _xreader.error():
+
+BOOL xreader.error()
+--------------------
+
+Returns true if and only if an error condition was determined the last
+time the file was checked.
+
+XXX ...
+
 .. _file.version():
 
 STRING version()
