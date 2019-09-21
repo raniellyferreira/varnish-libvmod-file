@@ -1,0 +1,71 @@
+# looks like -*- vcl -*-
+
+varnishtest "check timers turn on/off as VCL goes warm/cold"
+
+shell {echo -n "foo bar baz quux" > ${tmpdir}/file}
+
+# Debug param vclrel causes VCLs to be released without delay, making
+# it possible to check the effects of temperature changes.
+varnish v1 -arg "-p debug=+vclrel" -vcl {
+	import ${vmod_file};
+	backend b { .host = "${bad_ip}"; }
+
+	sub vcl_init {
+		new rdr1 = file.reader("${tmpdir}/file", ttl=0.1s,
+		                       log_checks=true);
+		new rdr2 = file.reader("${tmpdir}/file", ttl=0.1s,
+		                       log_checks=true);
+		new rdr3 = file.reader("${tmpdir}/file", ttl=0.1s,
+		                       log_checks=true);
+		new rdr4 = file.reader("${tmpdir}/file", ttl=0.1s,
+		                       log_checks=true);
+		new rdr5 = file.reader("${tmpdir}/file", ttl=0.1s,
+		                       log_checks=true);
+	}
+} -start
+
+logexpect l1 -v v1 -d 1 -g raw -q "Debug" {
+	expect * * Debug	{^vmod file: rdr\d: check for \S+ running at}
+	expect * * Debug	{^vmod file: rdr\d: updating \S+ at}
+	expect * * Debug	{^vmod file: rdr\d: check for \S+ finished successfully at}
+
+	expect * * Debug	{^vmod file: rdr\d: check for \S+ running at}
+	expect * * Debug	{^vmod file: rdr\d: updating \S+ at}
+	expect * * Debug	{^vmod file: rdr\d: check for \S+ finished successfully at}
+
+	expect * * Debug	{^vmod file: rdr\d: check for \S+ running at}
+	expect * * Debug	{^vmod file: rdr\d: updating \S+ at}
+	expect * * Debug	{^vmod file: rdr\d: check for \S+ finished successfully at}
+
+	expect * * Debug	{^vmod file: rdr\d: check for \S+ running at}
+	expect * * Debug	{^vmod file: rdr\d: updating \S+ at}
+	expect * * Debug	{^vmod file: rdr\d: check for \S+ finished successfully at}
+
+	expect * * Debug	{^vmod file: rdr\d: check for \S+ running at}
+	expect * * Debug	{^vmod file: rdr\d: updating \S+ at}
+	expect * * Debug	{^vmod file: rdr\d: check for \S+ finished successfully at}
+} -run
+
+varnish v1 -vcl { backend b { .host = "${bad_ip}"; } }
+
+varnish v1 -cliok "vcl.state vcl1 cold"
+varnish v1 -cliok "vcl.list"
+
+delay .5
+# No checks run in the cold state, must be verified manually in the log.
+
+logexpect l1 -v v1 -d 0 -g raw -q "Debug" {
+	expect * * Debug	{^vmod file: rdr\d: check for \S+ running at}
+
+	expect * * Debug	{^vmod file: rdr\d: check for \S+ running at}
+
+	expect * * Debug	{^vmod file: rdr\d: check for \S+ running at}
+
+	expect * * Debug	{^vmod file: rdr\d: check for \S+ running at}
+
+	expect * * Debug	{^vmod file: rdr\d: check for \S+ running at}
+} -start
+
+varnish v1 -cliok "vcl.state vcl1 warm"
+
+logexpect l1 -wait
