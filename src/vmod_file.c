@@ -43,6 +43,7 @@
 
 #include "cache/cache.h"
 #include "vcl.h"
+#include "vtim.h"
 
 #include "vcc_if.h"
 
@@ -53,6 +54,7 @@
 	snprintf((rdr)->errbuf, (rdr)->errlen, "vmod file failure: " fmt, \
 		 __VA_ARGS__)
 
+#define INIT_SLEEP_INTERVAL 0.001
 #define ERRMSG_LEN 128
 #define NO_ERR ("No error")
 
@@ -196,7 +198,6 @@ vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 	struct sigevent sigev;
 	timer_t timerid;
 	struct itimerspec timerspec;
-	int flags;
 
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	AN(rdrp);
@@ -287,10 +288,8 @@ vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 	AZ(rdr->info->mtime.tv_nsec);
 	AZ(rdr->flags & (RDR_INITIALIZED | RDR_ERROR));
 	do {
-		AZ(pthread_rwlock_wrlock(&rdr->lock));
-		flags = rdr->flags;
-		AZ(pthread_rwlock_unlock(&rdr->lock));
-	} while ((flags & (RDR_INITIALIZED | RDR_ERROR)) == 0);
+		VTIM_sleep(INIT_SLEEP_INTERVAL);
+	} while ((rdr->flags & (RDR_INITIALIZED | RDR_ERROR)) == 0);
 
 	if (rdr->flags & RDR_ERROR) {
 		AN(strcmp(rdr->errbuf, NO_ERR));
