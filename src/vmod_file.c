@@ -455,26 +455,22 @@ vmod_reader__fini(struct VPFX(file_reader) **rdrp)
 VCL_STRING
 vmod_reader_get(VRT_CTX, struct VPFX(file_reader) *rdr)
 {
-	int flags;
-	VCL_STRING addr;
-
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	CHECK_OBJ_NOTNULL(rdr, FILE_READER_MAGIC);
 
 	AZ(pthread_rwlock_rdlock(&rdr->lock));
-	flags = rdr->flags;
-	addr = rdr->addr;
-	AZ(pthread_rwlock_unlock(&rdr->lock));
-
-	if (flags & RDR_ERROR) {
+	if (rdr->flags & RDR_ERROR) {
 		AN(strcmp(rdr->errbuf, NO_ERR));
 		VRT_fail(ctx, "%s.get(): %s", rdr->vcl_name, rdr->errbuf);
+		AZ(pthread_rwlock_unlock(&rdr->lock));
 		return (NULL);
 	}
 
-	AN(flags & RDR_MAPPED);
-	AN(addr);
-	return (addr);
+	AN(rdr->flags & RDR_MAPPED);
+	AN(rdr->addr);
+
+	AZ(pthread_rwlock_unlock(&rdr->lock));
+	return (rdr->addr);
 }
 
 VCL_STRING
