@@ -38,5 +38,6 @@ Makefile.in
 /src/tests/*.log
 /src/tests/*.trs
 /src/test-suite.log
+/src/tests/pathtest
 
 /src/coverage

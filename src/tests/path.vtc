@@ -1,0 +1,152 @@
+# looks like -*- vcl -*-
+
+varnishtest "path parameter for the reader constructor"
+
+shell {echo -n "tmpdir" > ${tmpdir}/pathtest}
+shell {echo -n "testdir" > ${testdir}/pathtest}
+
+varnish v1 -vcl {
+	import ${vmod_file};
+	backend b { .host = "${bad_ip}"; }
+
+	sub vcl_init {
+		new tmp = file.reader("pathtest", path="${tmpdir}:${testdir}");
+		new test = file.reader("pathtest", path="${testdir}:${tmpdir}");
+	}
+
+	sub vcl_recv {
+		return (synth(200));
+	}
+
+	sub vcl_synth {
+		set resp.http.Tmp = tmp.get();
+		set resp.http.Test = test.get();
+		return (deliver);
+	}
+} -start
+
+client c1 {
+	txreq
+	rxresp
+	expect resp.status == 200
+	expect resp.http.Tmp == "tmpdir"
+	expect resp.http.Test == "testdir"
+} -run
+
+varnish v1 -vcl {
+	import ${vmod_file};
+	backend b { .host = "${bad_ip}"; }
+
+	sub vcl_init {
+		new tmp = file.reader("pathtest",
+						path="${tmpdir}/:${testdir}/");
+		new test = file.reader("pathtest",
+						path="${testdir}/:${tmpdir}/");
+	}
+
+	sub vcl_recv {
+		return (synth(200));
+	}
+
+	sub vcl_synth {
+		set resp.http.Tmp = tmp.get();
+		set resp.http.Test = test.get();
+		return (deliver);
+	}
+}
+
+client c1 -run
+
+shell {echo -n "tmponly" > ${tmpdir}/pathtest}
+shell {echo -n "testonly" > ${testdir}/pathtest}
+
+varnish v1 -vcl {
+	import ${vmod_file};
+	backend b { .host = "${bad_ip}"; }
+
+	sub vcl_init {
+		new tmp = file.reader("pathtest", path="${tmpdir}");
+		new test = file.reader("pathtest", path="${testdir}");
+	}
+
+	sub vcl_recv {
+		return (synth(200));
+	}
+
+	sub vcl_synth {
+		set resp.http.Tmp = tmp.get();
+		set resp.http.Test = test.get();
+		return (deliver);
+	}
+}
+
+client c1 {
+	txreq
+	rxresp
+	expect resp.status == 200
+	expect resp.http.Tmp == "tmponly"
+	expect resp.http.Test == "testonly"
+} -run
+
+varnish v1 -vcl {
+	import ${vmod_file};
+	backend b { .host = "${bad_ip}"; }
+
+	sub vcl_init {
+		new tmp1 = file.reader("pathtest", path="${tmpdir}:");
+		new tmp2 = file.reader("pathtest", path=":${tmpdir}");
+	}
+
+	sub vcl_recv {
+		return (synth(200));
+	}
+
+	sub vcl_synth {
+		set resp.http.Tmp1 = tmp1.get();
+		set resp.http.Tmp2 = tmp2.get();
+		return (deliver);
+	}
+}
+
+client c1 {
+	txreq
+	rxresp
+	expect resp.status == 200
+	expect resp.http.Tmp1 == "tmponly"
+	expect resp.http.Tmp2 == "tmponly"
+} -run
+
+shell {
+	touch ${tmpdir}/unreadable
+	chmod a-r ${tmpdir}/unreadable
+}
+
+varnish v1 -errvcl {new rdr: unreadable not found or not readable on path} {
+	import ${vmod_file};
+	backend b { .host = "${bad_ip}"; }
+
+	sub vcl_init {
+		new rdr = file.reader("unreadable", path="${tmpdir}");
+	}
+}
+
+shell {rm -f ${tmpdir}/pathtest}
+shell {rm -f ${testdir}/pathtest}
+
+varnish v1 -errvcl {new rdr: pathtest not found or not readable on path} {
+	import ${vmod_file};
+	backend b { .host = "${bad_ip}"; }
+
+	sub vcl_init {
+		new rdr = file.reader("pathtest", path="${tmpdir}:${testdir}");
+	}
+}
+
+varnish v1 -errvcl {new rdr: path is empty} {
+	import ${vmod_file};
+	backend b { .host = "${bad_ip}"; }
+
+	sub vcl_init {
+		new rdr = file.reader("pathtest", path="");
+	}
+}

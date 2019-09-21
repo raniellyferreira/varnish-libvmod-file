@@ -44,6 +44,7 @@
 #include "cache/cache.h"
 #include "vcl.h"
 #include "vtim.h"
+#include "vsb.h"
 
 #include "vcc_if.h"
 
@@ -191,7 +192,7 @@ check(union sigval val)
 VCL_VOID
 vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 		  const char *vcl_name, struct vmod_priv *priv,
-		  VCL_STRING name, VCL_DURATION ttl)
+		  VCL_STRING name, VCL_STRING path, VCL_DURATION ttl)
 {
 	struct VPFX(file_reader) *rdr;
 	struct file_info *info;
@@ -205,11 +206,7 @@ vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 	AN(vcl_name);
 	AN(priv);
 
-	if (name == NULL) {
-		VFAIL(ctx, "new %s: name is NULL", vcl_name);
-		return;
-	}
-	if (*name == '\0') {
+	if (name == NULL || *name == '\0') {
 		VFAIL(ctx, "new %s: name is empty", vcl_name);
 		return;
 	}
@@ -234,6 +231,54 @@ vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 		return;
 	}
 
+	rdr->info = info;
+	rdr->vcl_name = strdup(vcl_name);
+
+	if (*name == '/')
+		info->path = strdup(name);
+	else {
+		struct vsb *search;
+		char *end, delim = ':';
+
+		AZ(info->path);
+		if (path == NULL || *path == '\0') {
+			VFAIL(ctx, "new %s: path is empty", vcl_name);
+			return;
+		}
+		search = VSB_new_auto();
+		for (const char *start = path; delim == ':'; VSB_clear(search),
+			     start = end + 1) {
+			end = strchr(start, delim);
+			if (end == NULL) {
+				delim = '\0';
+				end = strchr(start, delim);
+			}
+
+			VSB_bcat(search, start, end - start);
+			if (*(end - 1) != '/')
+				VSB_putc(search, '/');
+			VSB_cat(search, name);
+			VSB_finish(search);
+			if (access(VSB_data(search), R_OK) != 0)
+				continue;
+
+			info->path = malloc(VSB_len(search) + 1);
+			if (info->path == NULL) {
+				VSB_destroy(&search);
+				VFAIL(ctx, "new %s: allocating path", vcl_name);
+				return;
+			}
+			strcpy(info->path, VSB_data(search));
+			break;
+		}
+		VSB_destroy(&search);
+		if (info->path == NULL) {
+			VFAIL(ctx, "new %s: %s not found or not readable on "
+			      "path %s", vcl_name, name, path);
+			return;
+		}
+	}
+
 	errno = 0;
 	if (pthread_rwlock_init(&rdr->lock, NULL) != 0) {
 		VFAIL(ctx, "new %s: initializing lock: %s", vcl_name,
@@ -249,10 +294,6 @@ vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 		      vcl_name, vstrerror(errno));
 		return;
 	}
-
-	rdr->info = info;
-	rdr->vcl_name = strdup(vcl_name);
-	info->path = strdup(name);
 
 	memset(&sigev, 0, sizeof(sigev));
 	sigev.sigev_notify = SIGEV_THREAD;
