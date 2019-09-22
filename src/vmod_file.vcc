@@ -85,8 +85,8 @@ subsequent accesses via the reader object in VCL::
   }
 
 The content cache takes the form of a memory-mapping of the file, see
-``mmap(2)``. This has some consequences that are discussed further
-below.
+``mmap(2)``. This has some consequences that are discussed in the
+sections `File deletion and file updates`_ and `LIMITATIONS`_ below.
 
 Since the update checks run in the background, the file I/O that the
 checks require is not incurred during any request/response
@@ -246,7 +246,10 @@ example by invoking `varnishlog(1)`_ with ``-g raw``.
 
 Regardless of the value of ``log_checks``, errors encountered during
 update checks are logged with the tag ``Error``, also with XID 0 (and
-hence visible in raw grouping).
+hence visible in raw grouping). A message is always written to the log
+with the ``Debug`` tag (using XID 0) if an update check finds that the
+file has been deleted, but is already mapped (and hence is considered
+unchanged).
 
 Examples::
 
@@ -456,7 +459,44 @@ See `INSTALL.rst <INSTALL.rst>`_ in the source repository.
 LIMITATIONS
 ===========
 
-XXX ...
+Cached file contents (mapped with mmap(2)) consume virtual memory
+space.  This can become a burden if large files are cached, and/or if
+they are cached by many VMOD objects in many VCL instances.
+
+.. _vcl.discard: https://varnish-cache.org/docs/trunk/reference/varnish-cli.html#vcl-discard-configname-label
+
+.. |vcl.discard| replace:: ``vcl.discard``
+
+File caches are unmapped, and timers are deleted, when the VMOD's
+reader objects are finalized. This happens when the |vcl.discard|_
+command is used to unload VCL instances. While it is not uncommon for
+Varnish admins to neglect ``vcl.discard``, it can become a resource
+leak if too many obsolete VCL instances that use VMOD file are allowed
+to accumulate. Consider implementing a housekeeping procedure to clean
+up old VCLs.
+
+If the file unmappings and timer deletions fail during object
+finalization, error messages are written to the Varnish log using the
+tag ``Error`` (visible with raw grouping). While these errors are
+unlikely, if they do happen, they may be indications of resource
+leaks. Consider monitoring the log for such errors.
+
+.. _VSL query: https://varnish-cache.org/docs/trunk/reference/vsl-query.html
+
+Log messages from the VMOD begin with the prefix ``vmod file``. A `VSL
+query`_ can be used to craft a `varnishlog(1)`_ invocation that
+filters out the VMOD's messages::
+
+  varnishlog -g raw -q 'Debug ~ "^vmod file" or Error ~ "^vmod file"'
+
+It is platform-dependent whether file I/O is incurred during the first
+request/response transactions that read file contents, or whether at
+least some of the I/O work is done at initialization, and after file
+contents are newly mapped by an update check. The VMOD provides a hint
+that the mapped file contents may be used imminently (using
+``posix_madvise(3)`` with ``WILLNEED``); the kernel may respond by
+reading ahead in the file mapping. But that decision is left to the
+kernel.
 
 SEE ALSO
 ========
