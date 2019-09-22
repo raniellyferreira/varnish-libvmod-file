@@ -14,11 +14,15 @@ varnish v1 -vcl {
 
 	sub vcl_recv {
 		set req.http.Size = rdr.size();
+		set req.http.Mtime = rdr.mtime();
+		set req.http.Delta-Mtime = now - rdr.mtime();
 		return (synth(200));
 	}
 
 	sub vcl_synth {
 		set resp.http.Size = req.http.Size;
+		set resp.http.Mtime = req.http.Mtime;
+		set resp.http.Delta-Mtime = req.http.Delta-Mtime;
 		return (deliver);
 	}
 } -start
@@ -29,6 +33,9 @@ client c1 {
 	expect resp.status == 200
 	# Oddly, the BYTES to string conversion results in "16.000".
 	expect resp.http.Size ~ {^16\D}
+	expect resp.http.Mtime ~ "GMT$"
+	expect resp.http.Delta-Mtime > 0
+	expect resp.http.Delta-Mtime < 1
 } -run
 
 shell {echo -n "foo" > ${tmpdir}/sz}
@@ -39,6 +46,9 @@ client c1 {
 	rxresp
 	expect resp.status == 200
 	expect resp.http.Size ~ {^3\D}
+	expect resp.http.Mtime ~ "GMT$"
+	expect resp.http.Delta-Mtime > 0
+	expect resp.http.Delta-Mtime < 1
 } -run
 
 shell {rm -f ${tmpdir}/sz}
@@ -56,3 +66,37 @@ logexpect l1 -v v1 -d 1 -g vxid -q "VCL_Error" {
 	expect * = VCL_Error	{^rdr\.size\(\): vmod file failure: rdr: cannot read info about}
 	expect * = End
 } -run
+
+shell {touch ${tmpdir}/mtime}
+
+varnish v1 -vcl {
+	import ${vmod_file};
+	backend b { .host = "${bad_ip}"; }
+
+	sub vcl_init {
+		new rdr = file.reader("${tmpdir}/mtime", ttl=0.1s);
+	}
+
+	sub vcl_recv {
+		set req.http.Mtime = rdr.mtime();
+		return (synth(200));
+	}
+
+	sub vcl_synth {
+		set resp.http.Mtime = req.http.Mtime;
+		return (deliver);
+	}
+}
+
+shell {rm -f ${tmpdir}/mtime}
+delay .1
+
+logexpect l1 -v v1 -d 0 -g vxid -q "VCL_Error" {
+	expect 0 * Begin	req
+	expect * = VCL_Error	{^rdr\.mtime\(\): vmod file failure: rdr: cannot read info about}
+	expect * = End
+} -start
+
+client c1 -run
+
+logexpect l1 -wait

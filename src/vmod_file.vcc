@@ -78,6 +78,13 @@ Returns the size of the file when it was most recently checked.
 
 XXX ...
 
+$Method TIME .mtime()
+
+Returns the modification time of the file determined when it was mostly
+recently checked.
+
+XXX ...
+
 $Function STRING version()
 
 Return the version string for this VMOD.

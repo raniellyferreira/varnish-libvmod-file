@@ -541,6 +541,25 @@ vmod_reader_size(VRT_CTX, struct VPFX(file_reader) *rdr)
 	return (sz);
 }
 
+VCL_TIME
+vmod_reader_mtime(VRT_CTX, struct VPFX(file_reader) *rdr)
+{
+	time_t secs;
+	long nsecs;
+
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(rdr, FILE_READER_MAGIC);
+	CHECK_OBJ_NOTNULL(rdr->info, FILE_INFO_MAGIC);
+
+	AZ(pthread_rwlock_rdlock(&rdr->lock));
+	ERRCHK(ctx, rdr, "mtime", 0.);
+	secs = rdr->info->mtime.tv_sec;
+	nsecs = rdr->info->mtime.tv_nsec;
+	AZ(pthread_rwlock_unlock(&rdr->lock));
+
+	return (secs + nsecs * 1e-9);
+}
+
 VCL_STRING
 vmod_version(VRT_CTX)
 {

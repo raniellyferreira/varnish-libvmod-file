@@ -107,6 +107,16 @@ Returns the size of the file when it was most recently checked.
 
 XXX ...
 
+.. _xreader.mtime():
+
+TIME xreader.mtime()
+--------------------
+
+Returns the modification time of the file determined when it was mostly
+recently checked.
+
+XXX ...
+
 .. _file.version():
 
 STRING version()
