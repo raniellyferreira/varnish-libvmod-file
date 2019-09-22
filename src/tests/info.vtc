@@ -57,7 +57,7 @@ client c1 {
 	expect resp.http.Next-Check <= 0.1
 } -run
 
-shell {rm -f ${tmpdir}/sz}
+shell {chmod a-r ${tmpdir}/sz}
 delay .1
 
 client c1 {
@@ -69,7 +69,7 @@ client c1 {
 
 logexpect l1 -v v1 -d 1 -g vxid -q "VCL_Error" {
 	expect 0 * Begin	req
-	expect * = VCL_Error	{^rdr\.size\(\): vmod file failure: vcl1\.rdr: cannot read info about}
+	expect * = VCL_Error	{^rdr\.size\(\): vmod file failure: vcl1\.rdr: cannot open}
 	expect * = End
 } -run
 
@@ -94,12 +94,12 @@ varnish v1 -vcl {
 	}
 }
 
-shell {rm -f ${tmpdir}/mtime}
+shell {chmod a-r ${tmpdir}/mtime}
 delay .1
 
 logexpect l1 -v v1 -d 0 -g vxid -q "VCL_Error" {
 	expect 0 * Begin	req
-	expect * = VCL_Error	{^rdr\.mtime\(\): vmod file failure: vcl2\.rdr: cannot read info about}
+	expect * = VCL_Error	{^rdr\.mtime\(\): vmod file failure: vcl2\.rdr: cannot open}
 	expect * = End
 } -start
 
@@ -129,7 +129,7 @@ varnish v1 -vcl {
 	}
 }
 
-shell {rm -f ${tmpdir}/nxtchk}
+shell {chmod a-r ${tmpdir}/nxtchk}
 delay .1
 
 # next_check() is not affected by errors.

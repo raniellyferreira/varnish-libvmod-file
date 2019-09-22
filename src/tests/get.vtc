@@ -92,10 +92,10 @@ logexpect l1 -v v1 -d 1 -g raw -q "Debug" {
 	expect * * Debug	{^vmod file: vcl3\.rdr: check for \S+ finished successfully at}
 } -run
 
-shell {rm -f ${tmpdir}/file}
+shell {chmod a-r ${tmpdir}/file}
 delay .1
 
-client c1 {
+client c2 {
 	txreq
 	rxresp
 	expect resp.status == 503
@@ -104,13 +104,28 @@ client c1 {
 
 logexpect l1 -v v1 -d 1 -g vxid -q "VCL_Error" {
 	expect 0 * Begin	req
-	expect * = VCL_Error	{^rdr\.get\(\): vmod file failure: vcl3\.rdr: cannot read info about}
+	expect * = VCL_Error	{^rdr\.get\(\): vmod file failure: vcl3\.rdr: cannot open}
 	expect * = End
 } -run
 
 logexpect l1 -v v1 -d 1 -g raw -q "Error" {
-	expect * 0 Error	{^vmod file failure: vcl3\.rdr: cannot read info about}
+	expect * 0 Error	{^vmod file failure: vcl3\.rdr: cannot open}
 } -run
+
+shell {
+	rm -f ${tmpdir}/file
+	echo -n "quux baz bar foo" > ${tmpdir}/file
+}
+delay .1
+
+client c1 -run
+
+shell {rm -f ${tmpdir}/file}
+delay .1
+
+# The file is deleted, but the mapping is retained (until munmap), so
+# the client will still see the mapped contents.
+client c1 -run
 
 shell {echo -n "The quick brown fox jumps over the lazy dog." > ${tmpdir}/fox}
 
@@ -136,26 +151,30 @@ client c1 {
 	txreq
 	rxresp
 	expect resp.status == 200
-	expect resp.http.Get ~ "fox"
+	expect resp.http.Get == "The quick brown fox jumps over the lazy dog."
 } -run
 
-shell {echo -n "twentieth century fox" > ${tmpdir}/fox}
+shell {
+	rm -f ${tmpdir}/fox
+	echo -n "twentieth century fox" > ${tmpdir}/fox
+}
 delay .1
 
-# Whether or not the client sees the change, although no update checks
-# are performed, depends on whether changes in MAP_PRIVATE mapped
-# files are reflected in the mapped page. According to mmap(2), this
-# is unspecified. The change is apparently seen on Linux. Check the
-# test log to see if it happened on the present platform.
-client c1 -run
+client c1 {
+	txreq
+	rxresp
+	expect resp.status == 200
+	expect resp.http.Get == "The quick brown fox jumps over the lazy dog."
+} -run
 
-shell {rm -f ${tmpdir}/fox}
-delay .1
+varnish v1 -errvcl {cannot open} {
+	import ${vmod_file};
+	backend b { .host = "${bad_ip}"; }
 
-# On Linux at least, the mapping is retained after file deletion
-# (until munmap), so the client will still see the mapped contents.
-# XXX test on other platforms
-client c1 -run
+	sub vcl_init {
+		new rdr = file.reader("${tmpdir}/nosuchfile");
+	}
+}
 
 varnish v1 -errvcl {not a regular file} {
 	import ${vmod_file};

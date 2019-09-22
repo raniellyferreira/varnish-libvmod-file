@@ -74,6 +74,7 @@ struct file_info {
 #define RDR_ERROR	(1 << 1)
 #define RDR_MAPPED	(1 << 2)
 #define RDR_TIMER_INIT	(1 << 3)
+#define RDR_DELETED	(1 << 4)
 
 struct VPFX(file_reader) {
 	unsigned		magic;
@@ -104,7 +105,7 @@ check(union sigval val)
 	struct VPFX(file_reader) *rdr;
 	struct file_info *info;
 	struct stat st;
-	int fd;
+	int fd = -1;
 	void *addr;
 	char timbuf[VTIM_FORMAT_SIZE];
 	int err;
@@ -127,7 +128,24 @@ check(union sigval val)
 	AZ(pthread_rwlock_wrlock(&rdr->lock));
 
 	errno = 0;
-	if (stat(info->path, &st) != 0) {
+	if ((fd = open(info->path, O_RDONLY)) < 0) {
+		if (errno == ENOENT && (rdr->flags & RDR_MAPPED) != 0) {
+			rdr->flags |= RDR_DELETED;
+			VSL(SLT_Debug, 0, "vmod file: %s.%s: %s is deleted but "
+			    "already mapped", rdr->vcl_name, rdr->obj_name,
+			    info->path);
+			goto out;
+		}
+		VERRMSG(rdr, "%s.%s: cannot open %s: %s", rdr->vcl_name,
+			rdr->obj_name, info->path, vstrerror(errno));
+		VSL(SLT_Error, 0, rdr->errbuf);
+		rdr->flags |= RDR_ERROR;
+		goto out;
+	}
+	rdr->flags &= ~RDR_DELETED;
+
+	errno = 0;
+	if (fstat(fd, &st) != 0) {
 		VERRMSG(rdr, "%s.%s: cannot read info about %s: %s",
 			rdr->vcl_name, rdr->obj_name, info->path,
 			vstrerror(errno));
@@ -170,15 +188,6 @@ check(union sigval val)
 	}
 	rdr->flags &= ~RDR_MAPPED;
 
-	errno = 0;
-	if ((fd = open(info->path, O_RDONLY)) < 0) {
-		VERRMSG(rdr, "%s.%s: cannot open %s: %s", rdr->vcl_name,
-			rdr->obj_name, info->path, vstrerror(errno));
-		VSL(SLT_Error, 0, rdr->errbuf);
-		rdr->flags |= RDR_ERROR;
-		goto out;
-	}
-
 	/*
 	 * By mapping the length st_size + 1, and due to the fact that
 	 * mmap(2) fills the region of the mapped page past the length of
@@ -194,10 +203,8 @@ check(union sigval val)
 			rdr->obj_name, info->path, vstrerror(errno));
 		VSL(SLT_Error, 0, rdr->errbuf);
 		rdr->flags |= RDR_ERROR;
-		closefd(&fd);
 		goto out;
 	}
-	closefd(&fd);
 	AN(addr);
 	rdr->flags |= RDR_MAPPED;
 
@@ -231,6 +238,9 @@ check(union sigval val)
 
  out:
 	AZ(pthread_rwlock_unlock(&rdr->lock));
+
+	if (fd != -1)
+		closefd(&fd);
 
 	if ((rdr->flags & RDR_ERROR) == 0 && info->log_checks) {
 		VTIM_format(VTIM_real(), timbuf);
@@ -313,6 +323,7 @@ vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 	else {
 		struct vsb *search;
 		char *end, delim = ':';
+		int fd = -1;
 
 		AZ(info->path);
 		if (path == NULL || *path == '\0') {
@@ -333,12 +344,13 @@ vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 				VSB_putc(search, '/');
 			VSB_cat(search, name);
 			VSB_finish(search);
-			if (access(VSB_data(search), R_OK) != 0)
+			if ((fd = open(VSB_data(search), O_RDONLY)) < 0)
 				continue;
 
 			info->path = malloc(VSB_len(search) + 1);
 			if (info->path == NULL) {
 				VSB_destroy(&search);
+				closefd(&fd);
 				VFAIL(ctx, "new %s: allocating path", vcl_name);
 				return;
 			}
@@ -346,6 +358,8 @@ vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 			break;
 		}
 		VSB_destroy(&search);
+		if (fd != -1)
+			closefd(&fd);
 		if (info->path == NULL) {
 			VFAIL(ctx, "new %s: %s not found or not readable on "
 			      "path %s", vcl_name, name, path);
@@ -413,7 +427,7 @@ vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 	AZ(rdr->addr);
 	AZ(rdr->info->mtime.tv_sec);
 	AZ(rdr->info->mtime.tv_nsec);
-	AZ(rdr->flags & (RDR_INITIALIZED | RDR_ERROR));
+	AZ(rdr->flags & (RDR_INITIALIZED | RDR_ERROR | RDR_DELETED));
 	do {
 		VTIM_sleep(INIT_SLEEP_INTERVAL);
 	} while ((rdr->flags & (RDR_INITIALIZED | RDR_ERROR)) == 0);
@@ -425,6 +439,7 @@ vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 	}
 
 	AN(rdr->flags & RDR_MAPPED);
+	AZ(rdr->flags & RDR_DELETED);
 	AN(rdr->addr);
 	AN(rdr->info->mtime.tv_sec);
 	AN(rdr->info->mtime.tv_nsec);
