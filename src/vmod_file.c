@@ -106,6 +106,7 @@ check(union sigval val)
 	int fd;
 	void *addr;
 	char timbuf[VTIM_FORMAT_SIZE];
+	int err;
 
 	CAST_OBJ_NOTNULL(rdr, val.sival_ptr, FILE_READER_MAGIC);
 	CHECK_OBJ_NOTNULL(rdr->info, FILE_INFO_MAGIC);
@@ -195,6 +196,23 @@ check(union sigval val)
 	closefd(&fd);
 	AN(addr);
 	rdr->flags |= RDR_MAPPED;
+
+	if ((err = posix_madvise(addr, st.st_size + 1, POSIX_MADV_SEQUENTIAL))
+	    != 0) {
+		VERRMSG(rdr, "%s: madvise(SEQUENTIAL): %s", rdr->vcl_name,
+			vstrerror(err));
+		VSL(SLT_Error, 0, rdr->errbuf);
+		rdr->flags |= RDR_ERROR;
+		goto out;
+	}
+	if ((err = posix_madvise(addr, st.st_size + 1, POSIX_MADV_WILLNEED))
+	    != 0) {
+		VERRMSG(rdr, "%s: madvise(WILLNEED): %s", rdr->vcl_name,
+			vstrerror(err));
+		VSL(SLT_Error, 0, rdr->errbuf);
+		rdr->flags |= RDR_ERROR;
+		goto out;
+	}
 
 	info->mtime.tv_sec = st.st_mtim.tv_sec;
 	info->mtime.tv_nsec = st.st_mtim.tv_nsec;
