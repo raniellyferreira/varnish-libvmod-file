@@ -49,7 +49,7 @@ client c1 {
 
 logexpect l1 -v v1 -d 1 -g vxid -q "VCL_Error" {
 	expect 0 * Begin	req
-	expect * = VCL_Error	{^rdr\.synth\(\): vmod file failure: rdr: cannot read info about}
+	expect * = VCL_Error	{^rdr\.synth\(\): vmod file failure: vcl1\.rdr: cannot read info about}
 	expect * = End
 } -run
 

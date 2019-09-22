@@ -25,25 +25,25 @@ varnish v1 -arg "-p debug=+vclrel" -vcl {
 } -start
 
 logexpect l1 -v v1 -d 1 -g raw -q "Debug" {
-	expect * * Debug	{^vmod file: rdr\d: check for \S+ running at}
-	expect * * Debug	{^vmod file: rdr\d: updating \S+ at}
-	expect * * Debug	{^vmod file: rdr\d: check for \S+ finished successfully at}
+	expect * * Debug	{^vmod file: vcl1\.rdr\d: check for \S+ running at}
+	expect * * Debug	{^vmod file: vcl1\.rdr\d: updating \S+ at}
+	expect * * Debug	{^vmod file: vcl1\.rdr\d: check for \S+ finished successfully at}
 
-	expect * * Debug	{^vmod file: rdr\d: check for \S+ running at}
-	expect * * Debug	{^vmod file: rdr\d: updating \S+ at}
-	expect * * Debug	{^vmod file: rdr\d: check for \S+ finished successfully at}
+	expect * * Debug	{^vmod file: vcl1\.rdr\d: check for \S+ running at}
+	expect * * Debug	{^vmod file: vcl1\.rdr\d: updating \S+ at}
+	expect * * Debug	{^vmod file: vcl1\.rdr\d: check for \S+ finished successfully at}
 
-	expect * * Debug	{^vmod file: rdr\d: check for \S+ running at}
-	expect * * Debug	{^vmod file: rdr\d: updating \S+ at}
-	expect * * Debug	{^vmod file: rdr\d: check for \S+ finished successfully at}
+	expect * * Debug	{^vmod file: vcl1\.rdr\d: check for \S+ running at}
+	expect * * Debug	{^vmod file: vcl1\.rdr\d: updating \S+ at}
+	expect * * Debug	{^vmod file: vcl1\.rdr\d: check for \S+ finished successfully at}
 
-	expect * * Debug	{^vmod file: rdr\d: check for \S+ running at}
-	expect * * Debug	{^vmod file: rdr\d: updating \S+ at}
-	expect * * Debug	{^vmod file: rdr\d: check for \S+ finished successfully at}
+	expect * * Debug	{^vmod file: vcl1\.rdr\d: check for \S+ running at}
+	expect * * Debug	{^vmod file: vcl1\.rdr\d: updating \S+ at}
+	expect * * Debug	{^vmod file: vcl1\.rdr\d: check for \S+ finished successfully at}
 
-	expect * * Debug	{^vmod file: rdr\d: check for \S+ running at}
-	expect * * Debug	{^vmod file: rdr\d: updating \S+ at}
-	expect * * Debug	{^vmod file: rdr\d: check for \S+ finished successfully at}
+	expect * * Debug	{^vmod file: vcl1\.rdr\d: check for \S+ running at}
+	expect * * Debug	{^vmod file: vcl1\.rdr\d: updating \S+ at}
+	expect * * Debug	{^vmod file: vcl1\.rdr\d: check for \S+ finished successfully at}
 } -run
 
 varnish v1 -vcl { backend b { .host = "${bad_ip}"; } }
@@ -55,15 +55,15 @@ delay .5
 # No checks run in the cold state, must be verified manually in the log.
 
 logexpect l1 -v v1 -d 0 -g raw -q "Debug" {
-	expect * * Debug	{^vmod file: rdr\d: check for \S+ running at}
+	expect * * Debug	{^vmod file: vcl1\.rdr\d: check for \S+ running at}
 
-	expect * * Debug	{^vmod file: rdr\d: check for \S+ running at}
+	expect * * Debug	{^vmod file: vcl1\.rdr\d: check for \S+ running at}
 
-	expect * * Debug	{^vmod file: rdr\d: check for \S+ running at}
+	expect * * Debug	{^vmod file: vcl1\.rdr\d: check for \S+ running at}
 
-	expect * * Debug	{^vmod file: rdr\d: check for \S+ running at}
+	expect * * Debug	{^vmod file: vcl1\.rdr\d: check for \S+ running at}
 
-	expect * * Debug	{^vmod file: rdr\d: check for \S+ running at}
+	expect * * Debug	{^vmod file: vcl1\.rdr\d: check for \S+ running at}
 } -start
 
 varnish v1 -cliok "vcl.state vcl1 warm"

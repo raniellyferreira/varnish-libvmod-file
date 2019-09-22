@@ -87,9 +87,9 @@ client c1 {
 } -run
 
 logexpect l1 -v v1 -d 1 -g raw -q "Debug" {
-	expect * * Debug	{^vmod file: rdr: check for \S+ running at}
-	expect * * Debug	{^vmod file: rdr: updating \S+ at}
-	expect * * Debug	{^vmod file: rdr: check for \S+ finished successfully at}
+	expect * * Debug	{^vmod file: vcl3\.rdr: check for \S+ running at}
+	expect * * Debug	{^vmod file: vcl3\.rdr: updating \S+ at}
+	expect * * Debug	{^vmod file: vcl3\.rdr: check for \S+ finished successfully at}
 } -run
 
 shell {rm -f ${tmpdir}/file}
@@ -104,12 +104,12 @@ client c1 {
 
 logexpect l1 -v v1 -d 1 -g vxid -q "VCL_Error" {
 	expect 0 * Begin	req
-	expect * = VCL_Error	{^rdr\.get\(\): vmod file failure: rdr: cannot read info about}
+	expect * = VCL_Error	{^rdr\.get\(\): vmod file failure: vcl3\.rdr: cannot read info about}
 	expect * = End
 } -run
 
 logexpect l1 -v v1 -d 1 -g raw -q "Error" {
-	expect * 0 Error	{^vmod file failure: rdr: cannot read info about}
+	expect * 0 Error	{^vmod file failure: vcl3\.rdr: cannot read info about}
 } -run
 
 shell {echo -n "The quick brown fox jumps over the lazy dog." > ${tmpdir}/fox}

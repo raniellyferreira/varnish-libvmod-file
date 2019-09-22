@@ -39,7 +39,7 @@ client c2 {
 	rxresp
 	expect resp.status == 200
 	expect resp.http.Error == "true"
-	expect resp.http.Errmsg ~ "^vmod file failure: rdr: cannot read info about"
+	expect resp.http.Errmsg ~ {^vmod file failure: vcl1\.rdr: cannot read info about}
 } -run
 
 shell {touch ${tmpdir}/error}

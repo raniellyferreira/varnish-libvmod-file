@@ -82,6 +82,7 @@ struct VPFX(file_reader) {
 	struct file_info	*info;
 	char			*addr;
 	char			*vcl_name;
+	char			*obj_name;
 	char			*errbuf;
 	size_t			errlen;
 	timer_t			timerid;
@@ -112,29 +113,32 @@ check(union sigval val)
 	CHECK_OBJ_NOTNULL(rdr->info, FILE_INFO_MAGIC);
 	info = rdr->info;
 	AN(rdr->vcl_name);
+	AN(rdr->obj_name);
 	AN(rdr->errbuf);
 	AN(info->path);
 
 	if (info->log_checks) {
 		VTIM_format(VTIM_real(), timbuf);
-		VSL(SLT_Debug, 0, "vmod file: %s: check for %s running at %s",
-		    rdr->vcl_name, info->path, timbuf);
+		VSL(SLT_Debug, 0,
+		    "vmod file: %s.%s: check for %s running at %s",
+		    rdr->vcl_name, rdr->obj_name, info->path, timbuf);
 	}
 
 	AZ(pthread_rwlock_wrlock(&rdr->lock));
 
 	errno = 0;
 	if (stat(info->path, &st) != 0) {
-		VERRMSG(rdr, "%s: cannot read info about %s: %s", rdr->vcl_name,
-			info->path, vstrerror(errno));
+		VERRMSG(rdr, "%s.%s: cannot read info about %s: %s",
+			rdr->vcl_name, rdr->obj_name, info->path,
+			vstrerror(errno));
 		VSL(SLT_Error, 0, rdr->errbuf);
 		rdr->flags |= RDR_ERROR;
 		goto out;
 	}
 
 	if (!S_ISREG(st.st_mode)) {
-		VERRMSG(rdr, "%s: %s is not a regular file", rdr->vcl_name,
-			info->path);
+		VERRMSG(rdr, "%s.%s: %s is not a regular file", rdr->vcl_name,
+			rdr->obj_name, info->path);
 		VSL(SLT_Error, 0, rdr->errbuf);
 		rdr->flags |= RDR_ERROR;
 		goto out;
@@ -150,15 +154,15 @@ check(union sigval val)
 
 	if (info->log_checks) {
 		VTIM_format(VTIM_real(), timbuf);
-		VSL(SLT_Debug, 0, "vmod file: %s: updating %s at %s",
-		    rdr->vcl_name, info->path, timbuf);
+		VSL(SLT_Debug, 0, "vmod file: %s.%s: updating %s at %s",
+		    rdr->vcl_name, rdr->obj_name, info->path, timbuf);
 	}
 
 	if (rdr->flags & RDR_MAPPED) {
 		AN(rdr->addr);
 		if (munmap(rdr->addr, info->len) != 0) {
-			VERRMSG(rdr, "%s: unmap failed: %s", rdr->vcl_name,
-				vstrerror(errno));
+			VERRMSG(rdr, "%s.%s: unmap failed: %s", rdr->vcl_name,
+				rdr->obj_name, vstrerror(errno));
 			VSL(SLT_Error, 0, rdr->errbuf);
 			rdr->flags |= RDR_ERROR;
 			goto out;
@@ -168,8 +172,8 @@ check(union sigval val)
 
 	errno = 0;
 	if ((fd = open(info->path, O_RDONLY)) < 0) {
-		VERRMSG(rdr, "%s: cannot open %s: %s", rdr->vcl_name,
-			info->path, vstrerror(errno));
+		VERRMSG(rdr, "%s.%s: cannot open %s: %s", rdr->vcl_name,
+			rdr->obj_name, info->path, vstrerror(errno));
 		VSL(SLT_Error, 0, rdr->errbuf);
 		rdr->flags |= RDR_ERROR;
 		goto out;
@@ -186,8 +190,8 @@ check(union sigval val)
 	errno = 0;
 	if ((addr = mmap(NULL, st.st_size + 1, PROT_READ, MAP_PRIVATE, fd, 0))
 	    == MAP_FAILED) {
-		VERRMSG(rdr, "%s: could not map %s: %s", rdr->vcl_name,
-			info->path, vstrerror(errno));
+		VERRMSG(rdr, "%s.%s: could not map %s: %s", rdr->vcl_name,
+			rdr->obj_name, info->path, vstrerror(errno));
 		VSL(SLT_Error, 0, rdr->errbuf);
 		rdr->flags |= RDR_ERROR;
 		closefd(&fd);
@@ -199,16 +203,16 @@ check(union sigval val)
 
 	if ((err = posix_madvise(addr, st.st_size + 1, POSIX_MADV_SEQUENTIAL))
 	    != 0) {
-		VERRMSG(rdr, "%s: madvise(SEQUENTIAL): %s", rdr->vcl_name,
-			vstrerror(err));
+		VERRMSG(rdr, "%s.%s: madvise(SEQUENTIAL): %s", rdr->vcl_name,
+			rdr->obj_name, vstrerror(err));
 		VSL(SLT_Error, 0, rdr->errbuf);
 		rdr->flags |= RDR_ERROR;
 		goto out;
 	}
 	if ((err = posix_madvise(addr, st.st_size + 1, POSIX_MADV_WILLNEED))
 	    != 0) {
-		VERRMSG(rdr, "%s: madvise(WILLNEED): %s", rdr->vcl_name,
-			vstrerror(err));
+		VERRMSG(rdr, "%s.%s: madvise(WILLNEED): %s", rdr->vcl_name,
+			rdr->obj_name, vstrerror(err));
 		VSL(SLT_Error, 0, rdr->errbuf);
 		rdr->flags |= RDR_ERROR;
 		goto out;
@@ -228,11 +232,11 @@ check(union sigval val)
  out:
 	AZ(pthread_rwlock_unlock(&rdr->lock));
 
-	if (info->log_checks) {
+	if ((rdr->flags & RDR_ERROR) == 0 && info->log_checks) {
 		VTIM_format(VTIM_real(), timbuf);
-		VSL(SLT_Debug, 0,
-		    "vmod file: %s: check for %s finished successfully at %s",
-		    rdr->vcl_name, info->path, timbuf);
+		VSL(SLT_Debug, 0, "vmod file: %s.%s: check for %s "
+		    "finished successfully at %s", rdr->vcl_name,
+		    rdr->obj_name, info->path, timbuf);
 	}
 	return;
 }
@@ -300,7 +304,8 @@ vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 	}
 
 	rdr->info = info;
-	rdr->vcl_name = strdup(vcl_name);
+	rdr->obj_name = strdup(vcl_name);
+	rdr->vcl_name = strdup(VCL_Name(ctx->vcl));
 	info->log_checks = log_checks;
 
 	if (*name == '/')
@@ -355,7 +360,8 @@ vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 		return;
 	}
 
-	rdr->errlen = ERRMSG_LEN + strlen(name) + strlen(vcl_name);
+	rdr->errlen = ERRMSG_LEN + strlen(name) + strlen(vcl_name)
+		+ strlen(VCL_Name(ctx->vcl));
 	errno = 0;
 	rdr->errbuf = malloc(rdr->errlen);
 	if (rdr->errbuf == NULL) {
@@ -436,24 +442,24 @@ vmod_reader__fini(struct VPFX(file_reader) **rdrp)
 	TAKE_OBJ_NOTNULL(rdr, rdrp, FILE_READER_MAGIC);
 
 	if (rdr->flags & RDR_TIMER_INIT) {
-		AN(rdr->vcl_name);
+		AN(rdr->obj_name);
 
 		errno = 0;
 		if (timer_delete(rdr->timerid) != 0)
-			VSL(SLT_Error, 0, "vmod file %s finalization: "
+			VSL(SLT_Error, 0, "vmod file %s.%s finalization: "
 			    "cannot delete timer: %s", rdr->vcl_name,
-			    vstrerror(errno));
+			    rdr->obj_name, vstrerror(errno));
 	}
 
 	if (rdr->flags & RDR_MAPPED) {
 		CHECK_OBJ_NOTNULL(rdr->info, FILE_INFO_MAGIC);
 		AN(rdr->addr);
-		AN(rdr->vcl_name);
+		AN(rdr->obj_name);
 
 		errno = 0;
 		if (munmap(rdr->addr, rdr->info->len) != 0)
-			VSL(SLT_Error, 0, "vmod file %s finalization: "
-			    "unmap failed: %s", rdr->vcl_name,
+			VSL(SLT_Error, 0, "vmod file %s.%s finalization: "
+			    "unmap failed: %s", rdr->vcl_name, rdr->obj_name,
 			    vstrerror(errno));
 	}
 
@@ -465,6 +471,8 @@ vmod_reader__fini(struct VPFX(file_reader) **rdrp)
 	}
 	if (rdr->vcl_name != NULL)
 		free(rdr->vcl_name);
+	if (rdr->obj_name != NULL)
+		free(rdr->obj_name);
 	if (rdr->errbuf != NULL)
 		free(rdr->errbuf);
 	FREE_OBJ(rdr);
@@ -474,7 +482,7 @@ vmod_reader__fini(struct VPFX(file_reader) **rdrp)
 		if ((rdr)->flags & RDR_ERROR) {				\
 			AN(strcmp((rdr)->errbuf, NO_ERR));		\
 			VRT_fail((ctx), "%s." method "(): %s",		\
-				 (rdr)->vcl_name, (rdr)->errbuf);	\
+				 (rdr)->obj_name, (rdr)->errbuf);	\
 			AZ(pthread_rwlock_unlock(&(rdr)->lock));	\
 			return ret;					\
 		}							\
@@ -507,7 +515,7 @@ vmod_reader_synth(VRT_CTX, struct VPFX(file_reader) *rdr)
 
 	if ((ctx->method & VCL_MET_SYNTH) == 0) {
 		VRT_fail(ctx, "%s.synth() may only be called in vcl_synth",
-			 rdr->vcl_name);
+			 rdr->obj_name);
 		return;
 	}
 
@@ -589,7 +597,7 @@ vmod_reader_next_check(VRT_CTX, struct VPFX(file_reader) *rdr)
 	errno = 0;
 	if (timer_gettime(rdr->timerid, &t) != 0) {
 		VRT_fail(ctx, "%s.next_check(): timer read failed: %s",
-			rdr->vcl_name, vstrerror(errno));
+			rdr->obj_name, vstrerror(errno));
 		return (0.);
 	}
 	return (t.it_value.tv_sec + 1e-9 * t.it_value.tv_nsec);
