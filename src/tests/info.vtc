@@ -123,6 +123,7 @@ varnish v1 -vcl {
 	}
 
 	sub vcl_synth {
+		set resp.http.Error = rdr.error();
 		set resp.http.Next-Check = req.http.Next-Check;
 		return (deliver);
 	}
@@ -136,6 +137,7 @@ client c1 {
 	txreq
 	rxresp
 	expect resp.status == 200
+	expect resp.http.Error == "true"
 	expect resp.http.Next-Check >= 0
 	expect resp.http.Next-Check <= 0.1
 } -run
