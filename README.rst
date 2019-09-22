@@ -213,18 +213,47 @@ Regardless of the value of ``log_checks``, errors encountered during
 update checks are logged with the tag ``Error``, also with XID 0 (and
 hence visible in raw grouping).
 
+Examples::
+
+  sub vcl_init {
+	# A reader for the file at the absolute path, using default
+	# ttl=120s.
+	new foo = file.reader("/path/to/foo");
+
+	# A reader for the file on the default search path, with
+	# update checks every five minutes.
+	new synth_body = file.reader("synth_body.html", ttl=300s);
+
+	# A reader for the file on the given search path, with
+	# default TTL, and logging for update checks.
+	new bar = file.reader("bar", path="/var/run/d1:/var/run/d2",
+	                       log_checks=true);
+
+	# A reader for the file with no update checks.
+	new baz = file.reader("baz", ttl=0s);
+  }
+
 .. _xreader.get():
 
 STRING xreader.get()
 --------------------
 
-Retrieves the contents of file specified in the constructor. If the
-``ttl`` has elapsed, then ``.get()`` checks if the file has changed;
-if so, the new contents of the file are read, cached and returned. If
-the ``ttl`` has not elapsed, or if the file is unchanged, then the
-cached contents are returned.
+Return the contents of the file specified in the constructor, as
+currently cached. If the most recent update check encountered an
+error, then VCL failure is invoked (see `ERRORS`_).
 
-XXX ...
+Example::
+
+  sub vcl_deliver {
+	set resp.http.Foo = foo.get();
+  }
+
+Take care if you use ``.get()`` to set a header, as in the example,
+that the file contents do *not* end in a newline. If so, then the
+newline appears after the header contents, resulting in an empty line
+after the header. Since an empty line separates the headers from the
+body in an HTTP message, this is very likely to result in an invalid
+message.
 
 .. _xreader.synth():
 
@@ -241,7 +270,7 @@ XXX ...
 BOOL xreader.error()
 --------------------
 
-Returns true if and only if an error condition was determined the last
+Return true if and only if an error condition was determined the last
 time the file was checked.
 
 XXX ...
@@ -251,7 +280,7 @@ XXX ...
 STRING xreader.errmsg()
 -----------------------
 
-Returns the error message for any error condition determined the last
+Return the error message for any error condition determined the last
 time the file was checked, or a message indicating that there was no
 error.
 
@@ -262,7 +291,7 @@ XXX ...
 BYTES xreader.size()
 --------------------
 
-Returns the size of the file when it was most recently checked.
+Return the size of the file when it was most recently checked.
 
 XXX ...
 
@@ -271,7 +300,7 @@ XXX ...
 TIME xreader.mtime()
 --------------------
 
-Returns the modification time of the file determined when it was mostly
+Return the modification time of the file determined when it was mostly
 recently checked.
 
 XXX ...
@@ -281,7 +310,7 @@ XXX ...
 DURATION xreader.next_check()
 -----------------------------
 
-Returns the time remaining until the next check will be performed.
+Return the time remaining until the next check will be performed.
 
 XXX ...
 
