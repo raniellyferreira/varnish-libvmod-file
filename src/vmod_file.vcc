@@ -20,25 +20,183 @@ SYNOPSIS
 
   import file;
 
+  # File reader object
+  new <OBJ> = file.reader(STRING name [, STRING path] [, DURATION ttl])
+  STRING <obj>.get()
+  VOID <obj>.synth()
+  BOOL <obj>.error()
+  STRING <obj>.errmsg()
+  BYTES <obj>.size()
+  TIME <obj>.mtime()
+  DURATION <obj>.next_check()
+
   # VMOD version
   STRING file.version()
 
 DESCRIPTION
 ===========
 
-VMOD file is a Varnish module for reading the contents of a file and
-caching its contents, returning the contents for use in the Varnish
-Configuration Language (VCL), and checking if the file has changed
-after specified time intervals elapse. If the file has changed, then
-the new contents are read and cached, and are then available in VCL.
+.. _Varnish: http://www.varnish-cache.org/
 
-XXX ...
+.. _VCL: http://varnish-cache.org/docs/trunk/reference/vcl.html
+
+VMOD file is a `Varnish`_ module for reading the contents of a file
+and caching its contents, returning the contents for use in the
+Varnish Configuration Language (`VCL`_), and checking if the file has
+changed after specified time intervals elapse.
+
+.. _VMOD std: https://varnish-cache.org/docs/trunk/reference/vmod_std.html
+
+.. _std.fileread(): https://varnish-cache.org/docs/trunk/reference/vmod_std.html#std-fileread
+
+.. |std.fileread()| replace:: ``std.fileread()``
+
+`VMOD std`_, provided with the Varnish distribution, has the function
+|std.fileread()|_, which reads the contents of a file exactly once on
+the first invocation, caches the contents, and returns the cached
+contents on every subsequent invocation. The cache is static, so the
+cached file contents do not change when VCL is reloaded, or at any
+other time until Varnish stops.  This minimizes file I/O during
+request/response transactions, which is incurred only on the first
+invocation. But it means that changed file contents do not become
+available in VCL with |std.fileread()|_ unless Varnish is re-started.
+
+VMOD file provides a `reader object`_, which caches file contents
+during the invocation of ``vcl_init`` (hence at VCL load time). The
+object is provided by default with a time interval, for which the
+concept "TTL" (time to live) is re-applied. When a TTL is set, the
+file is periodically checked for changes in a background thread, every
+time the TTL elapses. If the file has changed, then the file cache is
+reloaded with its new contents, which then become available for
+subsequent accesses via the reader object in VCL::
+
+  import file;
+
+  sub vcl_init {
+	# Cache the contents of a file, and check it for changes
+	# every 30 seconds.
+	new rdr = file.reader("/path/to/myfile", ttl=30s);
+  }
+
+  sub vcl_recv {
+	# Read the cached contents of the file. If the file was found
+	# to have changed, then the new contents are returned by .get().
+	set req.http.Myfile = rdr.get();
+  }
+
+Changed file contents may in fact become visible immediately, before
+the TTL elapses; but that is platform-dependent (see the discussion
+below).
+
+Since the update checks run in the background, the file I/O that the
+checks require is not incurred during any request/response
+transaction. The I/O effort to read the contents may also happen in
+the background, or during the first access after the file has changed;
+that too is platform-dependent (see below).
+
+.. _vcl.state: https://varnish-cache.org/docs/trunk/reference/varnish-cli.html#vcl-state-configname-auto-cold-warm
+
+.. _varnish-cli(7): https://varnish-cache.org/docs/trunk/reference/varnish-cli.html
+
+.. |vcl.state| replace:: ``vcl.state``
+
+.. _vcl.use: https://varnish-cache.org/docs/trunk/reference/varnish-cli.html#vcl-use-configname-label
+
+.. |vcl.use| replace:: ``vcl.use``
+
+When a VCL instance transitions to the cold state, the file update
+checks for any of the instance's objects are suspended (see
+|vcl.state|_ in `varnish-cli(7)`_). When it transitions back to the
+warm state (which also happens during an invocation of |vcl.use|_ if
+the VCL had previously been cold), then the files are immediately
+checked for changes, updating the cached contents if necessary, and
+the update checks in the background resume at the TTL interval.
+
+.. _reader object:
 
 $Object reader(PRIV_VCL, STRING name,
  STRING path="/usr/local/etc/varnish:/usr/local/share/varnish/vcl:/usr/etc/varnish:/usr/share/varnish/vcl",
                DURATION ttl=120, BOOL log_checks=0)
 
-XXX ...
+Create an object to read and cache the contents of the file named
+``name``, and optionally check the file for changes at the interval
+``ttl``. ``name`` MAY NOT be the empty string. If ``ttl`` is set to
+0s, then no periodic checks are performed. ``ttl`` MAY NOT be < 0s.
+By default, ``ttl`` is 120 seconds.
+
+If ``name`` denotes an absolute path (beginning with ``/``), then the
+file at that path is read. Otherwise, the file is searched for in the
+directories given in the colon-separated string ``path``. The file
+MUST fulfill the following conditions:
+
+* The file MUST be accessible to the owner of the Varnish child
+  process.
+
+* The process owner MUST have read permissions on the file.
+
+* The file MUST be a regular file, or a symbolic link pointing to a
+  regular file.
+
+If any of these are not true of ``name``, or if no such file is found
+on the ``path``, then the VCL load fails with an error message.
+
+.. _vcl_path: https://varnish-cache.org/docs/trunk/reference/varnishd.html#vcl-path
+
+.. |vcl_path| replace:: ``vcl_path``
+
+The default value of ``path`` combines the default values of the
+varnishd parameter |vcl_path|_ for development builds (installed in
+``/usr/local``) and production deployments (installed in ``/usr``),
+with the development directories first. ``path`` MAY NOT be the empty
+string.
+
+If there is an error finding or reading the file, then the VCL load
+fails with a message describing the error. If the read succeeds, then
+the file contents are cached, and are available via the reader
+object's methods.
+
+The content cache takes the form of a memory-mapping of the file, see
+``mmap(2)``.
+
+If initialization succeeds and ``ttl`` > 0s, then update checks begin
+at that interval. A file is considered to have changed if any of its
+``stat(2)`` fields ``mtime``, ``dev`` or ``ino`` change. If the file
+has changed when a check is performed, it is re-read and the new
+contents are cached, for access via the object's methods.
+
+If an error is encountered when a check attempts to re-read the file,
+then subsequent method calls attempting to access the contents invoke
+VCL failure (see `ERRORS`_ below), with the ``VCL_Error`` message in
+the Varnish log describing the error.
+
+Checks continue at the ``ttl`` interval, regardless of any error. If
+the next update check after an error succeeds (because the problem has
+been fixed in the meantime), then the new contents are cached, and
+object methods can access the contents successfully.
+
+.. _vsl(7): https://varnish-cache.org/docs/trunk/reference/vsl.html
+
+.. _vsl_mask: https://varnish-cache.org/docs/trunk/reference/varnishd.html#vsl-mask
+
+.. |vsl_mask| replace:: ``vsl_mask``
+
+.. _raw grouping: https://varnish-cache.org/docs/trunk/reference/vsl-query.html#grouping
+
+.. _varnishlog(1): https://varnish-cache.org/docs/trunk/reference/varnishlog.html
+
+If ``log_checks`` is ``true`` (default ``false``), then the activity
+of update checks is logged in the Varnish log using the tag ``Debug``
+(see `vsl(7)`_). By default, ``Debug`` logs are filtered from the
+Varnish log; to see them, add ``Debug`` to the varnishd parameter
+|vsl_mask|_, for example by invoking varnishd with ``-p
+vsl_mask=+Debug``. Since update checks do not happen during any
+request/response transaction, they are logged with pseudo-XID 0, and
+are only visible when the log is read with `raw grouping`_, for
+example by invoking `varnishlog(1)`_ with ``-g raw``.
+
+Regardless of the value of ``log_checks``, errors encountered during
+update checks are logged with the tag ``Error``, also with XID 0 (and
+hence visible in raw grouping).
 
 $Method STRING .get()
 
