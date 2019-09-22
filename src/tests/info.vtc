@@ -17,6 +17,7 @@ varnish v1 -vcl {
 		set req.http.Mtime = rdr.mtime();
 		set req.http.Delta-Mtime = now - rdr.mtime();
 		set req.http.Next-Check = rdr.next_check();
+		set req.http.Deleted = rdr.deleted();
 		return (synth(200));
 	}
 
@@ -25,6 +26,7 @@ varnish v1 -vcl {
 		set resp.http.Mtime = req.http.Mtime;
 		set resp.http.Delta-Mtime = req.http.Delta-Mtime;
 		set resp.http.Next-Check = req.http.Next-Check;
+		set resp.http.Deleted = req.http.Deleted;
 		return (deliver);
 	}
 } -start
@@ -40,6 +42,7 @@ client c1 {
 	expect resp.http.Delta-Mtime < 1
 	expect resp.http.Next-Check >= 0
 	expect resp.http.Next-Check <= 0.1
+	expect resp.http.Deleted == "false"
 } -run
 
 shell {echo -n "foo" > ${tmpdir}/sz}
@@ -55,6 +58,7 @@ client c1 {
 	expect resp.http.Delta-Mtime < 1
 	expect resp.http.Next-Check >= 0
 	expect resp.http.Next-Check <= 0.1
+	expect resp.http.Deleted == "false"
 } -run
 
 shell {chmod a-r ${tmpdir}/sz}
@@ -140,4 +144,37 @@ client c1 {
 	expect resp.http.Error == "true"
 	expect resp.http.Next-Check >= 0
 	expect resp.http.Next-Check <= 0.1
+} -run
+
+shell {touch ${tmpdir}/deleteme}
+
+varnish v1 -vcl {
+	import ${vmod_file};
+	backend b { .host = "${bad_ip}"; }
+
+	sub vcl_init {
+		new rdr = file.reader("${tmpdir}/deleteme", ttl=0.1s);
+	}
+
+	sub vcl_recv {
+		return (synth(200));
+	}
+
+	sub vcl_synth {
+		set resp.http.Error = rdr.error();
+		set resp.http.Deleted = rdr.deleted();
+		return (deliver);
+	}
+}
+
+shell {rm -f ${tmpdir}/deleteme}
+delay .1
+
+# .error() == false, since deleted files are not considered in error.
+client c1 {
+	txreq
+	rxresp
+	expect resp.status == 200
+	expect resp.http.Error == "false"
+	expect resp.http.Deleted == "true"
 } -run

@@ -280,6 +280,25 @@ Example::
 	call do_file_error_handling;
   }
 
+.. _.deleted():
+
+$Method BOOL .deleted()
+
+Return true if and only if the file was found to have been deleted the
+last time the file was checked.
+
+As discussed in `File deletion and file updates`_ above, this is not
+an error condition, if the file had been previously mapped. Then the
+previously cached contents continue to be valid.
+
+Example::
+
+  import std;
+
+  if (rdr.deleted()) {
+	std.log("file deleted, continuing with the current cached contents");
+  }
+
 $Method BYTES .size()
 
 Return the size of the file as currently cached. Invokes VCL failure

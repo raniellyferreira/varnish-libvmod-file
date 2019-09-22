@@ -565,6 +565,15 @@ vmod_reader_errmsg(VRT_CTX, struct VPFX(file_reader) *rdr)
 	return (rdr->errbuf);
 }
 
+VCL_BOOL
+vmod_reader_deleted(VRT_CTX, struct VPFX(file_reader) *rdr)
+{
+	CHECK_OBJ_NOTNULL(rdr, FILE_READER_MAGIC);
+	(void)ctx;
+
+	return (rdr->flags & RDR_DELETED);
+}
+
 VCL_BYTES
 vmod_reader_size(VRT_CTX, struct VPFX(file_reader) *rdr)
 {

@@ -306,6 +306,28 @@ Example::
 	call do_file_error_handling;
   }
 
+.. _.deleted():
+
+.. _xreader.deleted():
+
+BOOL xreader.deleted()
+----------------------
+
+Return true if and only if the file was found to have been deleted the
+last time the file was checked.
+
+As discussed in `File deletion and file updates`_ above, this is not
+an error condition, if the file had been previously mapped. Then the
+previously cached contents continue to be valid.
+
+Example::
+
+  import std;
+
+  if (rdr.deleted()) {
+	std.log("file deleted, continuing with the current cached contents");
+  }
+
 .. _xreader.size():
 
 BYTES xreader.size()
