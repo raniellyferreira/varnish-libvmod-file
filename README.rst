@@ -88,16 +88,13 @@ subsequent accesses via the reader object in VCL::
 	set req.http.Myfile = rdr.get();
   }
 
-Changed file contents may in fact become visible immediately, before
-the TTL elapses; but that is platform-dependent (see the discussion
-below).
+The content cache takes the form of a memory-mapping of the file, see
+``mmap(2)``. This has some consequences that are discussed further
+below.
 
 Since the update checks run in the background, the file I/O that the
 checks require is not incurred during any request/response
-transaction. The I/O effort to read the contents may also happen in
-the background, or during the first access after initialization, or
-after the file has changed; that too is platform-dependent (see
-below).
+transaction.
 
 .. _vcl.state: https://varnish-cache.org/docs/trunk/reference/varnish-cli.html#vcl-state-configname-auto-cold-warm
 
@@ -116,6 +113,58 @@ warm state (which also happens during an invocation of |vcl.use|_ if
 the VCL had previously been cold), then the files are immediately
 checked for changes, updating the cached contents if necessary, and
 the update checks in the background resume at the TTL interval.
+
+File deletion and file updates
+------------------------------
+
+POSIX mandates that mmap(2) adds a reference for the file, which is
+not removed until the file is unmapped. In particular, it is not
+removed when the file is deleted -- the mapping continues to access
+the file's contents, even after deletion. (In that case, the file is
+not physically removed, but is no longer accessible by name in the
+filesystem.)
+
+.. |.deleted()| replace:: ``.deleted()``
+
+For this reason, if an update check finds that the file has been
+deleted, *it is not considered an error*, provided that the file has
+already been mapped. (It is an error if the file does not exist at
+initialization.) The file is considered unchanged, and the cached
+contents remain valid, at least until the next check. The
+|.deleted()|_ method of the `reader object`_ can be used in VCL to
+detect this situation.
+
+POSIX leaves unspecified whether changes in the underlying file
+immediately become visible in the memory mapping. On a system like
+Linux, changes are immediately visible, and hence will be reflected
+immediately be the VMOD.  While this may seem ideal for getting fast
+updates in VCL, it is in fact problematic:
+
+* File writes are not atomic; so the VMOD may return partial and
+  inconsistent contents for the file.
+
+* If the changed file is longer than the originally mapped file, the
+  portion that is longer than the original file is not
+  mapped. Contents returned by the VMOD will appear truncated.
+
+For these reasons, this is a reliable method to update a file:
+
+* Delete the file
+
+* Write the new contents to a new file of the same name (same path
+  location)
+
+This is the *only* method for updating files that the VMOD supports.
+
+After the deletion step, the previously cached contents remain valid.
+When the next update check detects the change performed by the second
+step, the new contents are mapped, and become available in their
+correct form via the VMOD.
+
+Other means of updating the file might "happen" to work, some of the
+time. But if not, it is not considered a bug of the VMOD. The VMOD
+works as designed *only* if the two-step procedure for updating files
+is followed.
 
 .. _reader object:
 
@@ -170,12 +219,12 @@ fails with a message describing the error. If the read succeeds, then
 the file contents are cached, and are available via the reader
 object's methods.
 
-The content cache takes the form of a memory-mapping of the file, see
-``mmap(2)``.
-
 If initialization succeeds and ``ttl`` > 0s, then update checks begin
 at that interval. A file is considered to have changed if any of its
-``stat(2)`` fields ``mtime``, ``dev`` or ``ino`` change. If the file
+``stat(2)`` fields ``mtime``, ``dev`` or ``ino`` change. As discussed
+above, the file is considered unchanged if the update check finds the
+the file has been deleted, provided that it has already been mapped;
+then the previously cached contents continue to be valid. If the file
 has changed when a check is performed, it is re-read and the new
 contents are cached, for access via the object's methods.
 
@@ -421,15 +470,18 @@ implement different error handling in VCL.
 Errors that may be encountered on the initial read or update checks
 include:
 
-* The ``stat(2)`` call to read file meta-data fails. This is what will
-  happen for typical file errors: when the file has been deleted, the
-  Varnish process cannot access it, or the process owner does not have
-  read permissions.
+* The file cannot be opened for read. This is what will happen for
+  typical file errors: the Varnish process cannot access the file, or
+  the process owner does not have read permissions.
+
+* The file does not exist at initialization time. As discussed above,
+  this is not an error for an update check, if the file has already
+  been mapped.
 
 * The file is neither a regular file nor a symbolic link that points
   to a regular file.
 
-* Any of the internal calls to open and map the file fail.
+* Any of the internal calls to map the file fail.
 
 REQUIREMENTS
 ============
