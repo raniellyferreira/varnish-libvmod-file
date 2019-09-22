@@ -309,9 +309,16 @@ Example::
 BYTES xreader.size()
 --------------------
 
-Return the size of the file when it was most recently checked.
+Return the size of the file as currently cached. Invokes VCL failure
+if the most recent update check encountered an error.
 
-XXX ...
+Example::
+
+  # Use the cached synth body if non-empty, otherwise use the standard
+  # Varnish Guru Meditation.
+  if (synth_body.size() > 0B) {
+	synth_body.synth();
+  }
 
 .. _xreader.mtime():
 
@@ -319,9 +326,18 @@ TIME xreader.mtime()
 --------------------
 
 Return the modification time of the file determined when it was mostly
-recently checked.
+recently checked. Invokes VCL failure if the most recent update check
+encountered an error.
 
-XXX ...
+Example::
+
+  import std;
+
+  # Log a message if the file has not been updated within the last
+  # day.
+  if (now - rdr.mtime() > 1d) {
+	std.log("file last updated at " + rdr.mtime());
+  }
 
 .. _xreader.next_check():
 
@@ -330,7 +346,15 @@ DURATION xreader.next_check()
 
 Return the time remaining until the next check will be performed.
 
-XXX ...
+Example::
+
+  import vtc;
+
+  # If an update is pending within the next second, wait for it.
+  if (synth_body.next_check() < 1s) {
+	vtc.sleep(1s);
+	synth_body.synth();
+  }
 
 .. _file.version():
 
