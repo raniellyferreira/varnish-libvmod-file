@@ -452,6 +452,16 @@ vmod_reader__fini(struct VPFX(file_reader) **rdrp)
 	FREE_OBJ(rdr);
 }
 
+#define ERRCHK(ctx, rdr, method, ret) do {				\
+		if ((rdr)->flags & RDR_ERROR) {				\
+			AN(strcmp((rdr)->errbuf, NO_ERR));		\
+			VRT_fail((ctx), "%s." method "(): %s",		\
+				 (rdr)->vcl_name, (rdr)->errbuf);	\
+			AZ(pthread_rwlock_unlock(&(rdr)->lock));	\
+			return ret;					\
+		}							\
+	} while (0)
+
 VCL_STRING
 vmod_reader_get(VRT_CTX, struct VPFX(file_reader) *rdr)
 {
@@ -459,12 +469,7 @@ vmod_reader_get(VRT_CTX, struct VPFX(file_reader) *rdr)
 	CHECK_OBJ_NOTNULL(rdr, FILE_READER_MAGIC);
 
 	AZ(pthread_rwlock_rdlock(&rdr->lock));
-	if (rdr->flags & RDR_ERROR) {
-		AN(strcmp(rdr->errbuf, NO_ERR));
-		VRT_fail(ctx, "%s.get(): %s", rdr->vcl_name, rdr->errbuf);
-		AZ(pthread_rwlock_unlock(&rdr->lock));
-		return (NULL);
-	}
+	ERRCHK(ctx, rdr, "get", NULL);
 
 	AN(rdr->flags & RDR_MAPPED);
 	AN(rdr->addr);
@@ -489,12 +494,7 @@ vmod_reader_synth(VRT_CTX, struct VPFX(file_reader) *rdr)
 	}
 
 	AZ(pthread_rwlock_rdlock(&rdr->lock));
-	if (rdr->flags & RDR_ERROR) {
-		AN(strcmp(rdr->errbuf, NO_ERR));
-		VRT_fail(ctx, "%s.synth(): %s", rdr->vcl_name, rdr->errbuf);
-		AZ(pthread_rwlock_unlock(&rdr->lock));
-		return;
-	}
+	ERRCHK(ctx, rdr, "synth", );
 
 	AN(rdr->flags & RDR_MAPPED);
 	AN(rdr->addr);
@@ -534,12 +534,7 @@ vmod_reader_size(VRT_CTX, struct VPFX(file_reader) *rdr)
 	CHECK_OBJ_NOTNULL(rdr->info, FILE_INFO_MAGIC);
 
 	AZ(pthread_rwlock_rdlock(&rdr->lock));
-	if (rdr->flags & RDR_ERROR) {
-		AN(strcmp(rdr->errbuf, NO_ERR));
-		VRT_fail(ctx, "%s.size(): %s", rdr->vcl_name, rdr->errbuf);
-		AZ(pthread_rwlock_unlock(&rdr->lock));
-		return (0);
-	}
+	ERRCHK(ctx, rdr, "size", 0);
 	sz = rdr->info->len - 1;
 	AZ(pthread_rwlock_unlock(&rdr->lock));
 
