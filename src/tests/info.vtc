@@ -1,0 +1,58 @@
+# looks like -*- vcl -*-
+
+varnishtest "methods for information about files and timers"
+
+shell {echo -n "foo bar baz quux" > ${tmpdir}/sz}
+
+varnish v1 -vcl {
+	import ${vmod_file};
+	backend b { .host = "${bad_ip}"; }
+
+	sub vcl_init {
+		new rdr = file.reader("${tmpdir}/sz", ttl=0.1s);
+	}
+
+	sub vcl_recv {
+		set req.http.Size = rdr.size();
+		return (synth(200));
+	}
+
+	sub vcl_synth {
+		set resp.http.Size = req.http.Size;
+		return (deliver);
+	}
+} -start
+
+client c1 {
+	txreq
+	rxresp
+	expect resp.status == 200
+	# Oddly, the BYTES to string conversion results in "16.000".
+	expect resp.http.Size ~ {^16\D}
+} -run
+
+shell {echo -n "foo" > ${tmpdir}/sz}
+delay .1
+
+client c1 {
+	txreq
+	rxresp
+	expect resp.status == 200
+	expect resp.http.Size ~ {^3\D}
+} -run
+
+shell {rm -f ${tmpdir}/sz}
+delay .1
+
+client c1 {
+	txreq
+	rxresp
+	expect resp.status == 503
+	expect resp.reason == "VCL failed"
+} -run
+
+logexpect l1 -v v1 -d 1 -g vxid -q "VCL_Error" {
+	expect 0 * Begin	req
+	expect * = VCL_Error	{^rdr\.size\(\): vmod file failure: rdr: cannot read info about}
+	expect * = End
+} -run

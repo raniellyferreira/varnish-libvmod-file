@@ -524,6 +524,28 @@ vmod_reader_errmsg(VRT_CTX, struct VPFX(file_reader) *rdr)
 	return (rdr->errbuf);
 }
 
+VCL_BYTES
+vmod_reader_size(VRT_CTX, struct VPFX(file_reader) *rdr)
+{
+	VCL_BYTES sz;
+
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(rdr, FILE_READER_MAGIC);
+	CHECK_OBJ_NOTNULL(rdr->info, FILE_INFO_MAGIC);
+
+	AZ(pthread_rwlock_rdlock(&rdr->lock));
+	if (rdr->flags & RDR_ERROR) {
+		AN(strcmp(rdr->errbuf, NO_ERR));
+		VRT_fail(ctx, "%s.size(): %s", rdr->vcl_name, rdr->errbuf);
+		AZ(pthread_rwlock_unlock(&rdr->lock));
+		return (0);
+	}
+	sz = rdr->info->len - 1;
+	AZ(pthread_rwlock_unlock(&rdr->lock));
+
+	return (sz);
+}
+
 VCL_STRING
 vmod_version(VRT_CTX)
 {

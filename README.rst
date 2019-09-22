@@ -98,6 +98,15 @@ error.
 
 XXX ...
 
+.. _xreader.size():
+
+BYTES xreader.size()
+--------------------
+
+Returns the size of the file when it was most recently checked.
+
+XXX ...
+
 .. _file.version():
 
 STRING version()
