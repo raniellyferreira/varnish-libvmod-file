@@ -269,7 +269,14 @@ Return the error message for any error condition determined the last
 time the file was checked, or a message indicating that there was no
 error.
 
-XXX ...
+Example::
+
+  import std;
+
+  if (rdr.error()) {
+	std.log("rdr error: " + rdr.errmsg());
+	call do_file_error_handling;
+  }
 
 $Method BYTES .size()
 
