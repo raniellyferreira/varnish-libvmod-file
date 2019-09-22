@@ -25,7 +25,7 @@ SYNOPSIS
   import file;
 
   # File reader object
-  new <OBJ> = file.reader(STRING name [, STRING path] [, DURATION ttl])
+  new <obj> = file.reader(STRING name [, STRING path] [, DURATION ttl])
   STRING <obj>.get()
   VOID <obj>.synth()
   BOOL <obj>.error()
