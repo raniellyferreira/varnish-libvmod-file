@@ -189,8 +189,8 @@ If ``log_checks`` is ``true`` (default ``false``), then the activity
 of update checks is logged in the Varnish log using the tag ``Debug``
 (see `vsl(7)`_). By default, ``Debug`` logs are filtered from the
 Varnish log; to see them, add ``Debug`` to the varnishd parameter
-|vsl_mask|_, for example by invoking varnishd with ``-p
-vsl_mask=+Debug``. Since update checks do not happen during any
+|vsl_mask|_, for example by invoking varnishd with
+``-p vsl_mask=+Debug``. Since update checks do not happen during any
 request/response transaction, they are logged with pseudo-XID 0, and
 are only visible when the log is read with `raw grouping`_, for
 example by invoking `varnishlog(1)`_ with ``-g raw``.
