@@ -85,6 +85,12 @@ recently checked.
 
 XXX ...
 
+$Method DURATION .next_check()
+
+Returns the time remaining until the next check will be performed.
+
+XXX ...
+
 $Function STRING version()
 
 Return the version string for this VMOD.

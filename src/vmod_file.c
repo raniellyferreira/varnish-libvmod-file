@@ -560,6 +560,23 @@ vmod_reader_mtime(VRT_CTX, struct VPFX(file_reader) *rdr)
 	return (secs + nsecs * 1e-9);
 }
 
+VCL_DURATION
+vmod_reader_next_check(VRT_CTX, struct VPFX(file_reader) *rdr)
+{
+	struct itimerspec t;
+
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(rdr, FILE_READER_MAGIC);
+
+	errno = 0;
+	if (timer_gettime(rdr->timerid, &t) != 0) {
+		VRT_fail(ctx, "%s.next_check(): timer read failed: %s",
+			rdr->vcl_name, vstrerror(errno));
+		return (0.);
+	}
+	return (t.it_value.tv_sec + 1e-9 * t.it_value.tv_nsec);
+}
+
 VCL_STRING
 vmod_version(VRT_CTX)
 {

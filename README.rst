@@ -117,6 +117,15 @@ recently checked.
 
 XXX ...
 
+.. _xreader.next_check():
+
+DURATION xreader.next_check()
+-----------------------------
+
+Returns the time remaining until the next check will be performed.
+
+XXX ...
+
 .. _file.version():
 
 STRING version()
