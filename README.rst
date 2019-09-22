@@ -412,10 +412,8 @@ include:
 REQUIREMENTS
 ============
 
-The VMOD requires the Varnish master branch. See the source repository for
-versions that are compatible with released Varnish versions.
-
-XXX ...
+The VMOD currently requires the Varnish master branch, and is
+compatible with Varnish version 6.3.0.
 
 INSTALLATION
 ============
@@ -430,8 +428,17 @@ XXX ...
 SEE ALSO
 ========
 
-* varnishd(1)
-* vcl(7)
+* source repository website: https://code.uplex.de/uplex-varnish/libvmod-file
+* Varnish: http://www.varnish-cache.org/
+* varnishd(1): http://varnish-cache.org/docs/trunk/reference/varnishd.html
+* vcl(7): http://varnish-cache.org/docs/trunk/reference/vcl.html
+* varnishlog(1): https://varnish-cache.org/docs/trunk/reference/varnishlog.html
+* vsl(7): https://varnish-cache.org/docs/trunk/reference/vsl.html
+* vsl-query(7): https://varnish-cache.org/docs/trunk/reference/vsl-query.html
+* varnish-cli(7): https://varnish-cache.org/docs/trunk/reference/varnish-cli.html
+* VMOD std: https://varnish-cache.org/docs/trunk/reference/vmod_std.html
+* mmap(2)
+* stat(2)
 
 COPYRIGHT
 =========
