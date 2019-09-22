@@ -271,6 +271,8 @@ Example::
 	synth_body.synth();
   }
 
+.. _reader.error():
+
 .. _xreader.error():
 
 BOOL xreader.error()
@@ -370,7 +372,42 @@ Example::
 ERRORS
 ======
 
-XXX ...
+Methods that access a file's cached contents invoke VCL failure if
+there was an error during the most recent update check, just as if
+``return(fail)`` had been invoked in VCL. This means that:
+
+* If the error occurs during ``vcl_init`` (on the initial read of the
+  file), then the VCL load fails with an error message.
+
+* If the error occurs during any other subroutine besides
+  ``vcl_synth``, then a ``VCL_Error`` message describing the problem
+  is written to the log, and control is immediately directed to
+  ``vcl_synth``. In ``vcl_synth``, the response status
+  (``resp.status``) is set to 503, and the reason string
+  (``resp.reason``) is set to ``"VCL failed"``.
+
+* If the error happens during ``vcl_synth``, then the ``VCL_Error``
+  message is written, ``vcl_synth`` is aborted. The response line
+  ``"503 VCL failed"`` is set, but the client may just see connection
+  reset.
+
+.. |reader.error()| replace:: ``reader.error()``
+
+The |reader.error()|_ may be used to detect errors, for example to
+implement different error handling in VCL.
+
+Errors that may be encountered on the initial read or update checks
+include:
+
+* The ``stat(2)`` call to read file meta-data fails. This is what will
+  happen for typical file errors: when the file has been deleted, the
+  Varnish process cannot access it, or the process owner does not have
+  read permissions.
+
+* The file is neither a regular file nor a symbolic link that points
+  to a regular file.
+
+* Any of the internal calls to open and map the file fail.
 
 REQUIREMENTS
 ============
