@@ -568,9 +568,9 @@ vmod_reader_blob(VRT_CTX, struct VPFX(file_reader) *rdr)
 
 	AZ(pthread_rwlock_rdlock(&rdr->lock));
 	if (rdr->flags & RDR_ERROR) {
+		AN(strcmp(rdr->errbuf, NO_ERR));
 		VRT_fail(ctx, "%s.blob(): %s", rdr->obj_name, rdr->errbuf);
 		AZ(pthread_rwlock_unlock(&rdr->lock));
-		AN(strcmp(rdr->errbuf, NO_ERR));
 		WS_Release(ctx->ws, 0);
 		return (NULL);
 	}
