@@ -659,6 +659,7 @@ VPFX(event)(VRT_CTX, struct vmod_priv *priv, enum vcl_event_e e)
 			VSLIST_REMOVE_HEAD(th, list);
 			FREE_OBJ(ent);
 		}
+		free(th);
 		return (0);
 	case VCL_EVENT_WARM:
 		VSLIST_FOREACH(ent, th, list) {
