@@ -1,0 +1,58 @@
+# looks like -*- vcl -*-
+
+varnishtest "reader.blob()"
+
+shell {echo -n "foo bar baz quux" > ${tmpdir}/blob}
+
+varnish v1 -vcl {
+	import ${vmod_file};
+	import blob;
+	backend b { .host = "${bad_ip}"; }
+
+	sub vcl_init {
+		new rdr = file.reader("${tmpdir}/blob", ttl=0.1s);
+	}
+
+	sub vcl_recv {
+		set req.http.Blob = blob.encode(blob=rdr.blob());
+		return (synth(200));
+	}
+
+	sub vcl_synth {
+		set resp.http.Blob = req.http.Blob;
+		return (deliver);
+	}
+} -start
+
+client c1 {
+	txreq
+	rxresp
+	expect resp.status == 200
+	expect resp.http.Blob == "foo bar baz quux"
+} -run
+
+shell {echo -n "quux baz bar foo" > ${tmpdir}/blob}
+delay .1
+
+client c1 {
+	txreq
+	rxresp
+	expect resp.status == 200
+	expect resp.http.Blob == "quux baz bar foo"
+} -run
+
+shell {chmod a-r ${tmpdir}/blob}
+delay .1
+
+client c1 {
+	txreq
+	rxresp
+	expect resp.status == 503
+	expect resp.reason == "VCL failed"
+} -run
+
+logexpect l1 -v v1 -d 1 -g vxid -q "VCL_Error" {
+	expect 0 * Begin	req
+	expect * = VCL_Error	{^rdr\.blob\(\): vmod file failure: vcl1\.rdr: cannot open}
+	expect * = End
+} -run

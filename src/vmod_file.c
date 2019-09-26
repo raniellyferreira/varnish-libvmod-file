@@ -55,6 +55,9 @@
 	snprintf((rdr)->errbuf, (rdr)->errlen, "vmod file failure: " fmt, \
 		 __VA_ARGS__)
 
+/* Other VMODs may check the result of .blob() for this value, see vrt.h */
+#define VMOD_FILE_BLOB_MAGIC 0x069392c4
+
 #define INIT_SLEEP_INTERVAL 0.001
 #define ERRMSG_LEN 128
 #define NO_ERR ("No error")
@@ -544,6 +547,40 @@ vmod_reader_synth(VRT_CTX, struct VPFX(file_reader) *rdr)
 
 	AZ(pthread_rwlock_unlock(&rdr->lock));
 	return;
+}
+
+VCL_BLOB
+vmod_reader_blob(VRT_CTX, struct VPFX(file_reader) *rdr)
+{
+	struct vrt_blob *blob;
+
+	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
+	CHECK_OBJ_NOTNULL(rdr, FILE_READER_MAGIC);
+	CHECK_OBJ_NOTNULL(rdr->info, FILE_INFO_MAGIC);
+
+	if (WS_ReserveSize(ctx->ws, sizeof(*blob)) == 0) {
+		VRT_fail(ctx, "%s.blob(): cannot reserve workspace",
+			 rdr->obj_name);
+		return (NULL);
+	}
+	blob = (struct vrt_blob *)WS_Front(ctx->ws);
+	blob->type = VMOD_FILE_BLOB_MAGIC;
+
+	AZ(pthread_rwlock_rdlock(&rdr->lock));
+	if (rdr->flags & RDR_ERROR) {
+		VRT_fail(ctx, "%s.blob(): %s", rdr->obj_name, rdr->errbuf);
+		AZ(pthread_rwlock_unlock(&rdr->lock));
+		AN(strcmp(rdr->errbuf, NO_ERR));
+		WS_Release(ctx->ws, 0);
+		return (NULL);
+	}
+
+	blob->blob = rdr->addr;
+	blob->len = rdr->info->len - 1;
+	AZ(pthread_rwlock_unlock(&rdr->lock));
+
+	WS_Release(ctx->ws, sizeof(*blob));
+	return (blob);
 }
 
 VCL_BOOL

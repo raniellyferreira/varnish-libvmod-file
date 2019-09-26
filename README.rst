@@ -323,6 +323,24 @@ Example::
 	synth_body.synth();
   }
 
+.. _xreader.blob():
+
+BLOB xreader.blob()
+-------------------
+
+Return the file's contents as a BLOB. Invokes VCL failure if the most
+recent update check encountered an error.
+
+Example::
+
+  import blob;
+
+  # Set the backend response body to the hex-encoded contents of
+  # the file. Also works for resp.body in vcl_synth.
+  sub vcl_backend_error {
+	set beresp.body = blob.encode(HEX, blob=synth_body.blob());
+  }
+
 .. _reader.error():
 
 .. _xreader.error():
