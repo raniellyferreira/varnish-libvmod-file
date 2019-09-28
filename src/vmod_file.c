@@ -46,6 +46,14 @@
 #include "vtim.h"
 #include "vsb.h"
 
+/*
+ * Workaround for the difficulties with feature test macros in newer
+ * compiler versions, see:
+ * https://github.com/varnishcache/varnish-cache/issues/3051
+ */
+#undef ZERO_OBJ
+#define ZERO_OBJ(to, sz) (void)memset(to, 0, sz)
+
 #include "vcc_if.h"
 
 #define VFAIL(ctx, fmt, ...)					\
