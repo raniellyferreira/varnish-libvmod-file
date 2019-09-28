@@ -53,7 +53,7 @@ AM_CONDITIONAL(HAVE_GENHTML, [test -n "$GENHTML"])
 
 m4_ifndef([VARNISH_PREREQ], AC_MSG_ERROR([Need varnish.m4 -- see README.rst]))
 
-VARNISH_PREREQ([trunk])
+VARNISH_PREREQ([6.3.0])
 VARNISH_VMODS([file])
 
 VMOD_TESTS="$(cd $srcdir/src && echo tests/*.vtc)"
