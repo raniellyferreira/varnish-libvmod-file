@@ -2,22 +2,34 @@
 
 varnishtest "reader.synth()"
 
-shell {echo -n "foo bar baz quux" > ${tmpdir}/synth}
+shell {
+	echo -n "foo bar baz quux" > ${tmpdir}/synth
+	echo -n "ouch" > ${tmpdir}/backend_error
+}
 
 varnish v1 -vcl {
 	import ${vmod_file};
 	backend b { .host = "${bad_ip}"; }
 
 	sub vcl_init {
-		new rdr = file.reader("${tmpdir}/synth", ttl=0.1s);
+		new synth = file.reader("${tmpdir}/synth", ttl=0.1s);
+		new backend_err = file.reader("${tmpdir}/backend_error");
 	}
 
 	sub vcl_recv {
+		if (req.url == "/backend") {
+			return (pass);
+		}
 		return (synth(200));
 	}
 
 	sub vcl_synth {
-		rdr.synth();
+		synth.synth();
+		return (deliver);
+	}
+
+	sub vcl_backend_error {
+		backend_err.synth();
 		return (deliver);
 	}
 } -start
@@ -39,6 +51,13 @@ client c1 {
 	expect resp.body == "quux baz bar foo"
 } -run
 
+client c1 {
+	txreq -url /backend
+	rxresp
+	expect resp.status == 503
+	expect resp.body == "ouch"
+} -run
+
 shell {chmod a-r ${tmpdir}/synth}
 delay .1
 
@@ -49,7 +68,7 @@ client c1 {
 
 logexpect l1 -v v1 -d 1 -g vxid -q "VCL_Error" {
 	expect 0 * Begin	req
-	expect * = VCL_Error	{^rdr\.synth\(\): vmod file failure: vcl1\.rdr: cannot open}
+	expect * = VCL_Error	{^synth\.synth\(\): vmod file failure: vcl1\.synth: cannot open}
 	expect * = End
 } -run
 
@@ -73,7 +92,7 @@ varnish v1 -vcl {
 
 logexpect l1 -v v1 -d 0 -g vxid -q "VCL_Error" {
 	expect 0 * Begin	req
-	expect * = VCL_Error	{^rdr\.synth\(\) may only be called in vcl_synth$}
+	expect * = VCL_Error	{^rdr\.synth\(\) may only be called in vcl_synth or vcl_backend_error$}
 	expect * = End
 } -start
 

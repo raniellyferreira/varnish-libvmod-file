@@ -312,14 +312,19 @@ message.
 VOID xreader.synth()
 --------------------
 
-Generate a synthetic client response body from the file contents. This
-method may only be called in ``vcl_synth``. Invokes VCL failure if the
-most recent update check encountered an error, or if invoked in any
-other VCL subroutine besides ``vcl_synth``.
+Generate a synthetic response body from the file contents. This method
+may only be called in ``vcl_synth`` or ``vcl_backend_error``. Invokes
+VCL failure if the most recent update check encountered an error, or
+if invoked in any other VCL subroutine besides the two that are
+permitted.
 
 Example::
 
   sub vcl_synth {
+	synth_body.synth();
+  }
+
+  sub vcl_backend_error {
 	synth_body.synth();
   }
 
