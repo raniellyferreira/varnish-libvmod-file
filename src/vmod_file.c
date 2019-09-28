@@ -531,9 +531,9 @@ vmod_reader_synth(VRT_CTX, struct VPFX(file_reader) *rdr)
 	CHECK_OBJ_NOTNULL(ctx, VRT_CTX_MAGIC);
 	CHECK_OBJ_NOTNULL(rdr, FILE_READER_MAGIC);
 
-	if ((ctx->method & VCL_MET_SYNTH) == 0) {
-		VRT_fail(ctx, "%s.synth() may only be called in vcl_synth",
-			 rdr->obj_name);
+	if ((ctx->method & (VCL_MET_SYNTH | VCL_MET_BACKEND_ERROR)) == 0) {
+		VRT_fail(ctx, "%s.synth() may only be called in vcl_synth or "
+			 "vcl_backend_error", rdr->obj_name);
 		return;
 	}
 
