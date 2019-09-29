@@ -394,13 +394,9 @@ encountered an error.
 
 Example::
 
-  import std;
-
-  # Log a message if the file has not been updated within the last
-  # day.
-  if (now - rdr.mtime() > 1d) {
-	std.log("file last updated at " + rdr.mtime());
-  }
+  # A VCL TIME is converted to a string as an HTTP date, and hence is
+  # suitable for the Last-Modified header.
+  set resp.http.Last-Modified = rdr.mtime();
 
 $Method DURATION .next_check()
 
