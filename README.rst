@@ -179,7 +179,7 @@ new xreader = file.reader(STRING name, STRING path, DURATION ttl, BOOL log_check
 
    new xreader = file.reader(
       STRING name,
-      STRING path="/usr/local/etc/varnish:/usr/local/share/varnish/vcl:/usr/etc/varnish:/usr/share/varnish/vcl",
+      STRING path="/usr/local/etc/varnish:/usr/local/share/varnish/vcl:/etc/varnish:/usr/share/varnish/vcl",
       DURATION ttl=120,
       BOOL log_checks=0
    )
