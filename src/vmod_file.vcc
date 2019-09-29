@@ -167,7 +167,7 @@ is followed.
 .. _reader object:
 
 $Object reader(PRIV_VCL, STRING name,
- STRING path="/usr/local/etc/varnish:/usr/local/share/varnish/vcl:/usr/etc/varnish:/usr/share/varnish/vcl",
+ STRING path="/usr/local/etc/varnish:/usr/local/share/varnish/vcl:/etc/varnish:/usr/share/varnish/vcl",
                DURATION ttl=120, BOOL log_checks=0)
 
 Create an object to read and cache the contents of the file named
