@@ -445,13 +445,12 @@ Return the time remaining until the next check will be performed.
 
 Example::
 
-  import vtc;
+  import std;
 
-  # If an update is pending within the next second, wait for it.
-  if (synth_body.next_check() < 1s) {
-	vtc.sleep(1s);
-	synth_body.synth();
-  }
+  # Set the downstream caching TTL to the time remaining until the
+  # next update check.
+  set resp.http.Cache-Control = "public, max-age="
+	+ std.integer(duration=rdr.next_check());
 
 .. _file.version():
 
