@@ -64,7 +64,14 @@ AC_SUBST([VARNISH_LIBRARY_PATH],
 	[$LIBVARNISHAPI_LIBDIR:$LIBVARNISHAPI_LIBDIR/varnish])
 
 # Checks for C sources
-# XXX
+AC_CHECK_FUNCS([memset])
+AC_CHECK_FUNCS([munmap])
+AC_CHECK_FUNCS([strchr])
+AC_CHECK_FUNCS([strdup])
+AC_CHECK_HEADERS([fcntl.h])
+AC_FUNC_MALLOC
+AC_FUNC_MMAP
+AC_TYPE_SIZE_T
 
 # --enable-stack-protector
 AC_ARG_ENABLE(stack-protector,
