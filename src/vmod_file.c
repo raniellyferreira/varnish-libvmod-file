@@ -445,7 +445,6 @@ vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 	AZ(rdr->flags & RDR_DELETED);
 	AN(rdr->addr);
 	AN(rdr->info->mtime.tv_sec);
-	AN(rdr->info->mtime.tv_nsec);
 
 	*rdrp = rdr;
 }
