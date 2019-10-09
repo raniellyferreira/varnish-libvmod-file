@@ -74,5 +74,8 @@ rm -rf %{buildroot}
 /sbin/ldconfig
 
 %changelog
-* Tue Oct 8 2019 Geoff Simmons <geoff@uplex.de> - %{_version}-%{_release}
+* Wed Oct 9 2019 Geoff Simmons <geoff@uplex.de> - %{_version}-%{_release}
+- Bugfix: file mtime nanoseconds may be 0
+
+* Tue Oct 8 2019 Geoff Simmons <geoff@uplex.de> - 0.2.0-1
 - Require VRT 10.0, compatible with Varnish 6.3
