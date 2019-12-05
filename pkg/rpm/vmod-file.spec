@@ -74,7 +74,10 @@ rm -rf %{buildroot}
 /sbin/ldconfig
 
 %changelog
-* Wed Oct 9 2019 Geoff Simmons <geoff@uplex.de> - %{_version}-%{_release}
+* Thu Dec 5 2019 Geoff Simmons <geoff@uplex.de> - %{_version}-%{_release}
+- Bugfix: more reliable solution for zeroing data structures
+
+* Wed Oct 9 2019 Geoff Simmons <geoff@uplex.de> - 0.2.1-1
 - Bugfix: file mtime nanoseconds may be 0
 
 * Tue Oct 8 2019 Geoff Simmons <geoff@uplex.de> - 0.2.0-1
