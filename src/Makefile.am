@@ -6,13 +6,14 @@ AM_LDFLAGS = $(VARNISHAPI_LIBS) -ldl -lrt
 vmod_LTLIBRARIES = libvmod_file.la
 
 libvmod_file_la_SOURCES = \
-	vmod_file.c
+	vmod_file.c \
+	zero_obj.h
 
 nodist_libvmod_file_la_SOURCES = \
 	vcc_if.c \
 	vcc_if.h
 
-vmod_file.lo: $(nodist_libvmod_file_la_SOURCES)
+vmod_file.lo: $(nodist_libvmod_file_la_SOURCES) zero_obj.h
 
 dist_man_MANS = vmod_file.3
 
