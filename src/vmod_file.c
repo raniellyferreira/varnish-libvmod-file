@@ -37,7 +37,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdlib.h>
-#include <string.h>
 #include <signal.h>
 #include <stdio.h>
 
@@ -46,13 +45,7 @@
 #include "vtim.h"
 #include "vsb.h"
 
-/*
- * Workaround for the difficulties with feature test macros in newer
- * compiler versions, see:
- * https://github.com/varnishcache/varnish-cache/issues/3051
- */
-#undef ZERO_OBJ
-#define ZERO_OBJ(to, sz) (void)memset(to, 0, sz)
+#include "zero_obj.h"
 
 #include "vcc_if.h"
 
