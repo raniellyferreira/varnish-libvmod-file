@@ -407,14 +407,6 @@ vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 	timerspec.it_interval.tv_nsec
 		= (long)(1e9 * (ttl - timerspec.it_interval.tv_sec));
 
-	errno = 0;
-	if (timer_settime(timerid, 0, &timerspec, NULL) != 0) {
-		VFAIL(ctx, "new %s: cannot start update timer: %s", vcl_name,
-		      vstrerror(errno));
-		return;
-	}
-	rdr->flags |= RDR_TIMER_INIT;
-
 	th = init_priv_vcl(priv);
 	AN(th);
 	errno = 0;
@@ -431,6 +423,14 @@ vmod_reader__init(VRT_CTX, struct VPFX(file_reader) **rdrp,
 	AZ(rdr->info->mtime.tv_sec);
 	AZ(rdr->info->mtime.tv_nsec);
 	AZ(rdr->flags & (RDR_INITIALIZED | RDR_ERROR | RDR_DELETED));
+
+	errno = 0;
+	if (timer_settime(timerid, 0, &timerspec, NULL) != 0) {
+		VFAIL(ctx, "new %s: cannot start update timer: %s", vcl_name,
+		      vstrerror(errno));
+		return;
+	}
+	rdr->flags |= RDR_TIMER_INIT;
 	do {
 		VTIM_sleep(INIT_SLEEP_INTERVAL);
 	} while ((rdr->flags & (RDR_INITIALIZED | RDR_ERROR)) == 0);
