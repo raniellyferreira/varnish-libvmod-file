@@ -74,7 +74,10 @@ rm -rf %{buildroot}
 /sbin/ldconfig
 
 %changelog
-* Thu Dec 5 2019 Geoff Simmons <geoff@uplex.de> - %{_version}-%{_release}
+* Mon Dec 16 2019 Geoff Simmons <geoff@uplex.de> - %{_version}-%{_release}
+- Bugfix a race in object initialization
+
+* Thu Dec 5 2019 Geoff Simmons <geoff@uplex.de> - 0.2.2-1
 - Bugfix: more reliable solution for zeroing data structures
 
 * Wed Oct 9 2019 Geoff Simmons <geoff@uplex.de> - 0.2.1-1
