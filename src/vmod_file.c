@@ -562,7 +562,7 @@ vmod_reader_blob(VRT_CTX, struct VPFX(file_reader) *rdr)
 			 rdr->obj_name);
 		return (NULL);
 	}
-	blob = (struct vrt_blob *)WS_Front(ctx->ws);
+	blob = (struct vrt_blob *)WS_Reservation(ctx->ws);
 	blob->type = VMOD_FILE_BLOB_MAGIC;
 
 	AZ(pthread_rwlock_rdlock(&rdr->lock));
